@@ -228,9 +228,16 @@ export default function App() {
     });
   }
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gridTemplateRows: "1fr 100px", height: "100vh", overflow: "hidden", background: "#0a0a0f" }}>
+ const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr", gridTemplateRows: isMobile ? "60px 1fr 80px" : "1fr 100px", height: "100vh", overflow: "hidden", background: "#0a0a0f" }}>
       {/* Hidden YouTube Player */}
       <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, overflow: "hidden" }}>
         <div id="yt-player"></div>
