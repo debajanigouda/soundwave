@@ -11,7 +11,7 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
-  const [volume, setVolume] = useState(savedVolume);
+  const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -20,15 +20,18 @@ export default function App() {
   const [likedSongs, setLikedSongs] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
-  // Load saved state from localStorage
-  const savedSong = JSON.parse(localStorage.getItem("sw_current_song") || "null");
-  const savedVolume = parseFloat(localStorage.getItem("sw_volume") || "0.8");
 
   const audioRef = useRef(new Audio());
-  const progressInterval = useRef(null);
 
-  // ── Load trending on startup ──────────────────────────
+  // ── Load trending on startup + restore saved state ────
   useEffect(() => {
+    // Restore last played song
+    try {
+      const saved = localStorage.getItem("sw_current_song");
+      if (saved) setCurrentSong(JSON.parse(saved));
+      const savedVol = localStorage.getItem("sw_volume");
+      if (savedVol) setVolume(parseFloat(savedVol));
+    } catch (e) {}
     loadTrending();
   }, []);
 
@@ -36,27 +39,32 @@ export default function App() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js")
-        .then(() => console.log("✅ Service Worker registered!"))
+        .then(() => console.log("✅ SW registered!"))
         .catch(err => console.log("SW error:", err));
     }
+    const keepAlive = setInterval(() => {
+      if (navigator.serviceWorker.controller) {
+        const channel = new MessageChannel();
+        navigator.serviceWorker.controller.postMessage(
+          { type: "KEEP_ALIVE" }, [channel.port2]
+        );
+      }
+    }, 20000);
+    return () => clearInterval(keepAlive);
   }, []);
 
-  // ── Volume control ────────────────────────────────────
+  // ── Volume ────────────────────────────────────────────
   useEffect(() => {
     audioRef.current.volume = isMuted ? 0 : volume;
+    localStorage.setItem("sw_volume", volume.toString());
   }, [volume, isMuted]);
 
-  // ── Audio event listeners ─────────────────────────────
+  // ── Audio events ──────────────────────────────────────
   useEffect(() => {
     const audio = audioRef.current;
-
     const onEnded = () => {
-      if (isRepeat) {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        nextSong();
-      }
+      if (isRepeat) { audio.currentTime = 0; audio.play(); }
+      else nextSong();
     };
     const onTimeUpdate = () => {
       setProgress(Math.floor(audio.currentTime));
@@ -64,12 +72,10 @@ export default function App() {
     };
     const onWaiting = () => setIsBuffering(true);
     const onPlaying = () => setIsBuffering(false);
-
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("waiting", onWaiting);
     audio.addEventListener("playing", onPlaying);
-
     return () => {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("timeupdate", onTimeUpdate);
@@ -78,7 +84,7 @@ export default function App() {
     };
   }, [isRepeat, songs, isShuffle]);
 
-  // ── Media Session (keyboard & lock screen controls) ───
+  // ── Media Session ─────────────────────────────────────
   useEffect(() => {
     if (!currentSong || !("mediaSession" in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -86,43 +92,18 @@ export default function App() {
       artist: currentSong.artist,
       artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
     });
-    navigator.mediaSession.setActionHandler("play", () => {
-      audioRef.current.play();
-      setIsPlaying(true);
-    });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    });
+    navigator.mediaSession.setActionHandler("play", () => { audioRef.current.play(); setIsPlaying(true); });
+    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current.pause(); setIsPlaying(false); });
     navigator.mediaSession.setActionHandler("nexttrack", nextSong);
     navigator.mediaSession.setActionHandler("previoustrack", prevSong);
+    // Save current song
+    localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }, [currentSong]);
 
-  // ── Pre-fetch songs for instant play ─────────────────
+  // ── Prefetch ──────────────────────────────────────────
   useEffect(() => {
     if (songs.length > 0) prefetchSongs(songs.slice(0, 5));
   }, [songs]);
-  
-  // ── Save current song to localStorage ────────────────
-  useEffect(() => {
-    if (currentSong) {
-      localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
-    }
-  }, [currentSong]);
-
-  // ── Save volume to localStorage ───────────────────────
-  useEffect(() => {
-    localStorage.setItem("sw_volume", volume.toString());
-  }, [volume]);
-
-  // ── Restore last played song on startup ───────────────
-  useEffect(() => {
-    if (savedSong) {
-      setCurrentSong(savedSong);
-      audioRef.current.src = getStreamUrl(savedSong.youtubeId);
-      console.log("🎵 Restored last song:", savedSong.title);
-    }
-  }, []);
 
   // ── Functions ─────────────────────────────────────────
   async function loadTrending() {
@@ -148,8 +129,7 @@ export default function App() {
     setIsBuffering(true);
     setCurrentSong(song);
     setProgress(0);
-    const streamUrl = getStreamUrl(song.youtubeId);
-    audio.src = streamUrl;
+    audio.src = getStreamUrl(song.youtubeId);
     audio.volume = isMuted ? 0 : volume;
     try {
       await audio.play();
@@ -163,25 +143,14 @@ export default function App() {
 
   function togglePlay() {
     const audio = audioRef.current;
-    if (!currentSong) {
-      if (songs.length > 0) playSong(songs[0]);
-      return;
-    }
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-    } else {
-      audio.play();
-      setIsPlaying(true);
-    }
+    if (!currentSong) { if (songs.length > 0) playSong(songs[0]); return; }
+    if (isPlaying) { audio.pause(); setIsPlaying(false); }
+    else { audio.play(); setIsPlaying(true); }
   }
 
   function nextSong() {
     if (!songs.length) return;
-    if (isShuffle) {
-      playSong(songs[Math.floor(Math.random() * songs.length)]);
-      return;
-    }
+    if (isShuffle) { playSong(songs[Math.floor(Math.random() * songs.length)]); return; }
     const idx = songs.findIndex((s) => s.id === currentSong?.id);
     playSong(songs[(idx + 1) % songs.length]);
   }
@@ -209,7 +178,6 @@ export default function App() {
     });
   }
 
-  // ── Render ────────────────────────────────────────────
   return (
     <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gridTemplateRows: "1fr 100px", height: "100vh", overflow: "hidden", background: "#0a0a0f" }}>
       <Sidebar
