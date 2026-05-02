@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Sidebar from "./components/Sidebar";
-import Player from "./components/Player";
 import MainContent from "./components/MainContent";
+import Player from "./components/Player";
 import { PLAYLISTS, GENRES } from "./data/songs";
-import { searchSongs, getTrending, getStreamUrl, prefetchSongs } from "./api";
+import { searchSongs, getTrending, prefetchSongs } from "./api";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
@@ -20,69 +20,97 @@ export default function App() {
   const [likedSongs, setLikedSongs] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(false);
 
-  const audioRef = useRef(new Audio());
+  const playerRef = useRef(null);
+  const progressInterval = useRef(null);
 
-  // ── Load trending on startup + restore saved state ────
+  // ── Load YouTube IFrame API ───────────────────────────
   useEffect(() => {
-    // Restore last played song
-    try {
-      const saved = localStorage.getItem("sw_current_song");
-      if (saved) setCurrentSong(JSON.parse(saved));
-      const savedVol = localStorage.getItem("sw_volume");
-      if (savedVol) setVolume(parseFloat(savedVol));
-    } catch (e) {}
-    loadTrending();
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = () => {
+      playerRef.current = new window.YT.Player("yt-player", {
+        height: "0",
+        width: "0",
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          iv_load_policy: 3,
+          modestbranding: 1,
+          rel: 0,
+        },
+        events: {
+          onReady: (e) => {
+            e.target.setVolume(volume * 100);
+            console.log("✅ YouTube Player ready!");
+          },
+          onStateChange: (e) => {
+            const YT = window.YT.PlayerState;
+            if (e.data === YT.PLAYING) {
+              setIsPlaying(true);
+              setIsBuffering(false);
+              startProgressTracking();
+            } else if (e.data === YT.PAUSED) {
+              setIsPlaying(false);
+              stopProgressTracking();
+            } else if (e.data === YT.BUFFERING) {
+              setIsBuffering(true);
+            } else if (e.data === YT.ENDED) {
+              stopProgressTracking();
+              if (isRepeat) {
+                playerRef.current.seekTo(0);
+                playerRef.current.playVideo();
+              } else {
+                nextSong();
+              }
+            }
+          },
+          onError: (e) => {
+            console.error("YT Error:", e.data);
+            setIsBuffering(false);
+            nextSong();
+          },
+        },
+      });
+    };
+
+    return () => stopProgressTracking();
   }, []);
 
-  // ── Register Service Worker ───────────────────────────
-  useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js")
-        .then(() => console.log("✅ SW registered!"))
-        .catch(err => console.log("SW error:", err));
-    }
-    const keepAlive = setInterval(() => {
-      if (navigator.serviceWorker.controller) {
-        const channel = new MessageChannel();
-        navigator.serviceWorker.controller.postMessage(
-          { type: "KEEP_ALIVE" }, [channel.port2]
-        );
+  // ── Progress tracking ─────────────────────────────────
+  function startProgressTracking() {
+    stopProgressTracking();
+    progressInterval.current = setInterval(() => {
+      if (playerRef.current?.getCurrentTime) {
+        setProgress(Math.floor(playerRef.current.getCurrentTime()));
+        setDuration(Math.floor(playerRef.current.getDuration()) || 0);
       }
-    }, 20000);
-    return () => clearInterval(keepAlive);
-  }, []);
+    }, 1000);
+  }
+
+  function stopProgressTracking() {
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
+  }
 
   // ── Volume ────────────────────────────────────────────
   useEffect(() => {
-    audioRef.current.volume = isMuted ? 0 : volume;
+    if (!playerRef.current?.setVolume) return;
+    if (isMuted) {
+      playerRef.current.mute();
+    } else {
+      playerRef.current.unMute();
+      playerRef.current.setVolume(volume * 100);
+    }
     localStorage.setItem("sw_volume", volume.toString());
   }, [volume, isMuted]);
-
-  // ── Audio events ──────────────────────────────────────
-  useEffect(() => {
-    const audio = audioRef.current;
-    const onEnded = () => {
-      if (isRepeat) { audio.currentTime = 0; audio.play(); }
-      else nextSong();
-    };
-    const onTimeUpdate = () => {
-      setProgress(Math.floor(audio.currentTime));
-      setDuration(Math.floor(audio.duration) || 0);
-    };
-    const onWaiting = () => setIsBuffering(true);
-    const onPlaying = () => setIsBuffering(false);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("waiting", onWaiting);
-    audio.addEventListener("playing", onPlaying);
-    return () => {
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("waiting", onWaiting);
-      audio.removeEventListener("playing", onPlaying);
-    };
-  }, [isRepeat, songs, isShuffle]);
 
   // ── Media Session ─────────────────────────────────────
   useEffect(() => {
@@ -92,11 +120,10 @@ export default function App() {
       artist: currentSong.artist,
       artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
     });
-    navigator.mediaSession.setActionHandler("play", () => { audioRef.current.play(); setIsPlaying(true); });
-    navigator.mediaSession.setActionHandler("pause", () => { audioRef.current.pause(); setIsPlaying(false); });
+    navigator.mediaSession.setActionHandler("play", togglePlay);
+    navigator.mediaSession.setActionHandler("pause", togglePlay);
     navigator.mediaSession.setActionHandler("nexttrack", nextSong);
     navigator.mediaSession.setActionHandler("previoustrack", prevSong);
-    // Save current song
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }, [currentSong]);
 
@@ -104,6 +131,26 @@ export default function App() {
   useEffect(() => {
     if (songs.length > 0) prefetchSongs(songs.slice(0, 5));
   }, [songs]);
+
+  // ── Load trending on startup ──────────────────────────
+  useEffect(() => {
+    loadTrending();
+    try {
+      const saved = localStorage.getItem("sw_current_song");
+      if (saved) setCurrentSong(JSON.parse(saved));
+      const savedVol = localStorage.getItem("sw_volume");
+      if (savedVol) setVolume(parseFloat(savedVol));
+    } catch (e) {}
+  }, []);
+
+  // ── Service Worker ────────────────────────────────────
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js")
+        .then(() => console.log("✅ SW registered!"))
+        .catch(err => console.log("SW error:", err));
+    }
+  }, []);
 
   // ── Functions ─────────────────────────────────────────
   async function loadTrending() {
@@ -122,65 +169,55 @@ export default function App() {
     setIsLoading(false);
   }
 
-  async function playSong(song) {
-  if (!song) return;
-  const audio = audioRef.current;
-  audio.pause();
-  setIsBuffering(true);
-  setCurrentSong(song);
-  setProgress(0);
+  function playSong(song) {
+    if (!song) return;
+    setCurrentSong(song);
+    setProgress(0);
+    setIsBuffering(true);
+    setShowPlayer(true);
 
-  // Try multiple audio sources
-  const sources = [
-    `https://soundwave-server.onrender.com/api/stream/${song.youtubeId}`,
-    `https://www.youtube.com/watch?v=${song.youtubeId}`,
-  ];
-
-  // Use backend stream URL
-  const streamUrl = `https://soundwave-server.onrender.com/api/stream/${song.youtubeId}`;
-  audio.src = streamUrl;
-  audio.volume = isMuted ? 0 : volume;
-  audio.crossOrigin = "anonymous";
-
-  try {
-    await audio.play();
-    setIsPlaying(true);
-    setIsBuffering(false);
-  } catch (err) {
-    console.error("Playback error:", err);
-    setIsBuffering(false);
-    // Open in new tab as fallback
-    window.open(`https://www.youtube.com/watch?v=${song.youtubeId}`, '_blank');
+    if (playerRef.current?.loadVideoById) {
+      playerRef.current.loadVideoById(song.youtubeId);
+    }
   }
-}
 
   function togglePlay() {
-    const audio = audioRef.current;
-    if (!currentSong) { if (songs.length > 0) playSong(songs[0]); return; }
-    if (isPlaying) { audio.pause(); setIsPlaying(false); }
-    else { audio.play(); setIsPlaying(true); }
+    if (!currentSong) {
+      if (songs.length > 0) playSong(songs[0]);
+      return;
+    }
+    if (!playerRef.current) return;
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
+    }
   }
 
   function nextSong() {
     if (!songs.length) return;
-    if (isShuffle) { playSong(songs[Math.floor(Math.random() * songs.length)]); return; }
+    if (isShuffle) {
+      playSong(songs[Math.floor(Math.random() * songs.length)]);
+      return;
+    }
     const idx = songs.findIndex((s) => s.id === currentSong?.id);
     playSong(songs[(idx + 1) % songs.length]);
   }
 
   function prevSong() {
-    const audio = audioRef.current;
-    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+    if (progress > 3) {
+      playerRef.current?.seekTo(0);
+      return;
+    }
     if (!songs.length) return;
     const idx = songs.findIndex((s) => s.id === currentSong?.id);
     playSong(songs[(idx - 1 + songs.length) % songs.length]);
   }
 
   function seekTo(pct) {
-    const audio = audioRef.current;
-    if (!duration) return;
-    audio.currentTime = pct * duration;
-    setProgress(Math.floor(audio.currentTime));
+    if (!duration || !playerRef.current) return;
+    playerRef.current.seekTo(pct * duration, true);
+    setProgress(Math.floor(pct * duration));
   }
 
   function toggleLike(id) {
@@ -193,6 +230,12 @@ export default function App() {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gridTemplateRows: "1fr 100px", height: "100vh", overflow: "hidden", background: "#0a0a0f" }}>
+
+      {/* Hidden YouTube Player */}
+      <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, overflow: "hidden" }}>
+        <div id="yt-player"></div>
+      </div>
+
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
