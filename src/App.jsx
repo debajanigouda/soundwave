@@ -20,69 +20,42 @@ export default function App() {
   const [likedSongs, setLikedSongs] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
-  const [showPlayer, setShowPlayer] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const playerRef = useRef(null);
   const progressInterval = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ── Load YouTube IFrame API ───────────────────────────
   useEffect(() => {
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
     document.head.appendChild(tag);
-
     window.onYouTubeIframeAPIReady = () => {
       playerRef.current = new window.YT.Player("yt-player", {
-        height: "0",
-        width: "0",
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          modestbranding: 1,
-          rel: 0,
-        },
+        height: "0", width: "0",
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, rel: 0 },
         events: {
-          onReady: (e) => {
-            e.target.setVolume(volume * 100);
-            console.log("✅ YouTube Player ready!");
-          },
+          onReady: (e) => { e.target.setVolume(volume * 100); },
           onStateChange: (e) => {
             const YT = window.YT.PlayerState;
-            if (e.data === YT.PLAYING) {
-              setIsPlaying(true);
-              setIsBuffering(false);
-              startProgressTracking();
-            } else if (e.data === YT.PAUSED) {
-              setIsPlaying(false);
-              stopProgressTracking();
-            } else if (e.data === YT.BUFFERING) {
-              setIsBuffering(true);
-            } else if (e.data === YT.ENDED) {
-              stopProgressTracking();
-              if (isRepeat) {
-                playerRef.current.seekTo(0);
-                playerRef.current.playVideo();
-              } else {
-                nextSong();
-              }
-            }
+            if (e.data === YT.PLAYING) { setIsPlaying(true); setIsBuffering(false); startProgressTracking(); }
+            else if (e.data === YT.PAUSED) { setIsPlaying(false); stopProgressTracking(); }
+            else if (e.data === YT.BUFFERING) { setIsBuffering(true); }
+            else if (e.data === YT.ENDED) { stopProgressTracking(); if (isRepeat) { playerRef.current.seekTo(0); playerRef.current.playVideo(); } else { nextSong(); } }
           },
-          onError: (e) => {
-            console.error("YT Error:", e.data);
-            setIsBuffering(false);
-            nextSong();
-          },
+          onError: () => { setIsBuffering(false); nextSong(); },
         },
       });
     };
-
     return () => stopProgressTracking();
   }, []);
 
-  // ── Progress tracking ─────────────────────────────────
   function startProgressTracking() {
     stopProgressTracking();
     progressInterval.current = setInterval(() => {
@@ -94,30 +67,20 @@ export default function App() {
   }
 
   function stopProgressTracking() {
-    if (progressInterval.current) {
-      clearInterval(progressInterval.current);
-      progressInterval.current = null;
-    }
+    if (progressInterval.current) { clearInterval(progressInterval.current); progressInterval.current = null; }
   }
 
-  // ── Volume ────────────────────────────────────────────
   useEffect(() => {
     if (!playerRef.current?.setVolume) return;
-    if (isMuted) {
-      playerRef.current.mute();
-    } else {
-      playerRef.current.unMute();
-      playerRef.current.setVolume(volume * 100);
-    }
+    if (isMuted) { playerRef.current.mute(); }
+    else { playerRef.current.unMute(); playerRef.current.setVolume(volume * 100); }
     localStorage.setItem("sw_volume", volume.toString());
   }, [volume, isMuted]);
 
-  // ── Media Session ─────────────────────────────────────
   useEffect(() => {
     if (!currentSong || !("mediaSession" in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title,
-      artist: currentSong.artist,
+      title: currentSong.title, artist: currentSong.artist,
       artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
     });
     navigator.mediaSession.setActionHandler("play", togglePlay);
@@ -127,12 +90,10 @@ export default function App() {
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }, [currentSong]);
 
-  // ── Prefetch ──────────────────────────────────────────
   useEffect(() => {
     if (songs.length > 0) prefetchSongs(songs.slice(0, 5));
   }, [songs]);
 
-  // ── Load trending on startup ──────────────────────────
   useEffect(() => {
     loadTrending();
     try {
@@ -143,7 +104,6 @@ export default function App() {
     } catch (e) {}
   }, []);
 
-  // ── Service Worker ────────────────────────────────────
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js")
@@ -152,7 +112,6 @@ export default function App() {
     }
   }, []);
 
-  // ── Functions ─────────────────────────────────────────
   async function loadTrending() {
     setIsLoading(true);
     const trending = await getTrending();
@@ -174,41 +133,27 @@ export default function App() {
     setCurrentSong(song);
     setProgress(0);
     setIsBuffering(true);
-    setShowPlayer(true);
-
     if (playerRef.current?.loadVideoById) {
       playerRef.current.loadVideoById(song.youtubeId);
     }
   }
 
   function togglePlay() {
-    if (!currentSong) {
-      if (songs.length > 0) playSong(songs[0]);
-      return;
-    }
+    if (!currentSong) { if (songs.length > 0) playSong(songs[0]); return; }
     if (!playerRef.current) return;
-    if (isPlaying) {
-      playerRef.current.pauseVideo();
-    } else {
-      playerRef.current.playVideo();
-    }
+    if (isPlaying) { playerRef.current.pauseVideo(); }
+    else { playerRef.current.playVideo(); }
   }
 
   function nextSong() {
     if (!songs.length) return;
-    if (isShuffle) {
-      playSong(songs[Math.floor(Math.random() * songs.length)]);
-      return;
-    }
+    if (isShuffle) { playSong(songs[Math.floor(Math.random() * songs.length)]); return; }
     const idx = songs.findIndex((s) => s.id === currentSong?.id);
     playSong(songs[(idx + 1) % songs.length]);
   }
 
   function prevSong() {
-    if (progress > 3) {
-      playerRef.current?.seekTo(0);
-      return;
-    }
+    if (progress > 3) { playerRef.current?.seekTo(0); return; }
     if (!songs.length) return;
     const idx = songs.findIndex((s) => s.id === currentSong?.id);
     playSong(songs[(idx - 1 + songs.length) % songs.length]);
@@ -228,47 +173,77 @@ export default function App() {
     });
   }
 
- const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   return (
-    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "260px 1fr", gridTemplateRows: isMobile ? "60px 1fr 80px" : "1fr 100px", height: "100vh", overflow: "hidden", background: "#0a0a0f" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "100vh",
+      overflow: "hidden",
+      background: "#0a0a0f"
+    }}>
       {/* Hidden YouTube Player */}
-      <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, overflow: "hidden" }}>
+      <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1 }}>
         <div id="yt-player"></div>
       </div>
 
-      <Sidebar
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-        playlists={PLAYLISTS}
-        likedCount={likedSongs.size}
-      />
-      <MainContent
-        currentPage={currentPage}
-        searchQuery={searchQuery}
-        handleSearch={handleSearch}
-        songs={songs}
-        likedSongs={likedSongs}
-        currentSong={currentSong}
-        isPlaying={isPlaying}
-        isLoading={isLoading}
-        playSong={playSong}
-        toggleLike={toggleLike}
-        isShuffle={isShuffle}
-        setIsShuffle={setIsShuffle}
-        isRepeat={isRepeat}
-        setIsRepeat={setIsRepeat}
-        playlists={PLAYLISTS}
-        genres={GENRES}
-        loadTrending={loadTrending}
-        handleGenreSearch={handleSearch}
-      />
+      {/* Main Layout */}
+      <div style={{
+        display: "flex",
+        flex: 1,
+        overflow: "hidden",
+        flexDirection: "row"
+      }}>
+        {/* Sidebar — desktop only */}
+        {!isMobile && (
+          <Sidebar
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            playlists={PLAYLISTS}
+            likedCount={likedSongs.size}
+            isMobile={false}
+          />
+        )}
+
+        {/* Main Content */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {/* Mobile Header */}
+          {isMobile && (
+            <MobileHeader
+              currentPage={currentPage}
+              setCurrentPage={setCurrentPage}
+              playlists={PLAYLISTS}
+              likedCount={likedSongs.size}
+            />
+          )}
+
+          {/* Page Content */}
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <MainContent
+              currentPage={currentPage}
+              searchQuery={searchQuery}
+              handleSearch={handleSearch}
+              songs={songs}
+              likedSongs={likedSongs}
+              currentSong={currentSong}
+              isPlaying={isPlaying}
+              isLoading={isLoading}
+              playSong={playSong}
+              toggleLike={toggleLike}
+              isShuffle={isShuffle}
+              setIsShuffle={setIsShuffle}
+              isRepeat={isRepeat}
+              setIsRepeat={setIsRepeat}
+              playlists={PLAYLISTS}
+              genres={GENRES}
+              loadTrending={loadTrending}
+              handleGenreSearch={handleSearch}
+              isMobile={isMobile}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Player — always at bottom */}
       <Player
         currentSong={currentSong}
         isPlaying={isPlaying}
@@ -289,7 +264,80 @@ export default function App() {
         setIsRepeat={setIsRepeat}
         likedSongs={likedSongs}
         toggleLike={toggleLike}
+        isMobile={isMobile}
       />
+
+      {/* Mobile Bottom Nav */}
+      {isMobile && (
+        <div style={{ background: "#12121a", borderTop: "1px solid #2a2a45", display: "flex", justifyContent: "space-around", padding: "8px 0", flexShrink: 0 }}>
+          {[
+            { id: "home", label: "Home", icon: "🏠" },
+            { id: "search", label: "Discover", icon: "🔍" },
+            { id: "library", label: "Library", icon: "🎵" },
+            { id: "liked", label: "Liked", icon: "❤️" },
+          ].map(item => (
+            <button key={item.id} onClick={() => setCurrentPage(item.id)}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: currentPage === item.id ? "#6c63ff" : "#606080", padding: "4px 16px" }}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 500, fontFamily: "inherit" }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+// Mobile Header Component
+function MobileHeader({ currentPage, setCurrentPage, playlists, likedCount }) {
+  const [showDrawer, setShowDrawer] = useState(false);
+  const GRAD = "linear-gradient(135deg,#6c63ff,#ff6b9d)";
+
+  return (
+    <>
+      <div style={{ background: "#12121a", borderBottom: "1px solid #2a2a45", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 32, height: 32, background: GRAD, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>♪</div>
+          <span style={{ fontFamily: "'Clash Display',sans-serif", fontSize: 18, fontWeight: 700, background: GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</span>
+        </div>
+        <button onClick={() => setShowDrawer(true)}
+          style={{ background: "none", border: "none", color: "#a0a0c0", cursor: "pointer", fontSize: 24, lineHeight: 1 }}>☰</button>
+      </div>
+
+      {/* Drawer */}
+      {showDrawer && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999 }}>
+          <div onClick={() => setShowDrawer(false)} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.8)" }}/>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 280, background: "#12121a", padding: 20, overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <span style={{ fontFamily: "'Clash Display',sans-serif", fontSize: 20, fontWeight: 700, background: GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</span>
+              <button onClick={() => setShowDrawer(false)} style={{ background: "none", border: "none", color: "#606080", fontSize: 24, cursor: "pointer" }}>✕</button>
+            </div>
+            {[
+              { id: "home", label: "🏠 Home" },
+              { id: "search", label: "🔍 Discover" },
+              { id: "library", label: "🎵 Library" },
+              { id: "liked", label: `❤️ Liked (${likedCount})` },
+              { id: "downloads", label: "⬇️ Downloads" },
+            ].map(item => (
+              <button key={item.id} onClick={() => { setCurrentPage(item.id); setShowDrawer(false); }}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 16px", borderRadius: 10, background: currentPage === item.id ? "rgba(108,99,255,.15)" : "none", border: "none", color: currentPage === item.id ? "#6c63ff" : "#a0a0c0", fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", marginBottom: 4 }}>
+                {item.label}
+              </button>
+            ))}
+            <div style={{ marginTop: 24, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#606080", marginBottom: 12 }}>Playlists</div>
+            {playlists.map(p => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{p.emoji}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#f0f0ff" }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: "#606080" }}>{p.songIds.length} songs</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
