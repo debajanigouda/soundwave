@@ -25,9 +25,8 @@ export async function getTrending() {
 }
 
 export function getStreamUrl(youtubeId) {
-  return `${BASE}/stream/${youtubeId}`;
+  return `https://www.youtube.com/watch?v=${youtubeId}`;
 }
-
 // Pre-fetch next songs so they're instant when clicked
 export function prefetchSongs(songs) {
   songs.forEach(s => {

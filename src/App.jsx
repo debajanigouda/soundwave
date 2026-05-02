@@ -123,23 +123,36 @@ export default function App() {
   }
 
   async function playSong(song) {
-    if (!song) return;
-    const audio = audioRef.current;
-    audio.pause();
-    setIsBuffering(true);
-    setCurrentSong(song);
-    setProgress(0);
-    audio.src = getStreamUrl(song.youtubeId);
-    audio.volume = isMuted ? 0 : volume;
-    try {
-      await audio.play();
-      setIsPlaying(true);
-      setIsBuffering(false);
-    } catch (err) {
-      console.error("Playback error:", err);
-      setIsBuffering(false);
-    }
+  if (!song) return;
+  const audio = audioRef.current;
+  audio.pause();
+  setIsBuffering(true);
+  setCurrentSong(song);
+  setProgress(0);
+
+  // Try multiple audio sources
+  const sources = [
+    `https://soundwave-server.onrender.com/api/stream/${song.youtubeId}`,
+    `https://www.youtube.com/watch?v=${song.youtubeId}`,
+  ];
+
+  // Use backend stream URL
+  const streamUrl = `https://soundwave-server.onrender.com/api/stream/${song.youtubeId}`;
+  audio.src = streamUrl;
+  audio.volume = isMuted ? 0 : volume;
+  audio.crossOrigin = "anonymous";
+
+  try {
+    await audio.play();
+    setIsPlaying(true);
+    setIsBuffering(false);
+  } catch (err) {
+    console.error("Playback error:", err);
+    setIsBuffering(false);
+    // Open in new tab as fallback
+    window.open(`https://www.youtube.com/watch?v=${song.youtubeId}`, '_blank');
   }
+}
 
   function togglePlay() {
     const audio = audioRef.current;
