@@ -441,4 +441,3 @@ function NextIcon({ size = 24 }) {
 function PrevIcon({ size = 24 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>;
 }
-import { useState, useRef, useEffect } from "react";
