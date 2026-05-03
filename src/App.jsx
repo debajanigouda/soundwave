@@ -24,41 +24,21 @@ export default function App() {
 
   const playerRef = useRef(null);
   const progressInterval = useRef(null);
+  const songsRef = useRef(songs);
+  const currentSongRef = useRef(currentSong);
+  const isRepeatRef = useRef(isRepeat);
+  const isShuffleRef = useRef(isShuffle);
+  const playSongFn = useRef(null);
 
-  // ── Responsive detection ──────────────────────────────
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  useEffect(() => { songsRef.current = songs; }, [songs]);
+  useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
+  useEffect(() => { isRepeatRef.current = isRepeat; }, [isRepeat]);
+  useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
 
-  // ── YouTube IFrame API ────────────────────────────────
   useEffect(() => {
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(tag);
-    window.onYouTubeIframeAPIReady = () => {
-      playerRef.current = new window.YT.Player("yt-player", {
-        height: "0", width: "0",
-        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, rel: 0 },
-        events: {
-          onReady: (e) => { e.target.setVolume(volume * 100); },
-          onStateChange: (e) => {
-            const YT = window.YT.PlayerState;
-            if (e.data === YT.PLAYING) { setIsPlaying(true); setIsBuffering(false); startProgressTracking(); }
-            else if (e.data === YT.PAUSED) { setIsPlaying(false); stopProgressTracking(); }
-            else if (e.data === YT.BUFFERING) { setIsBuffering(true); }
-            else if (e.data === YT.ENDED) {
-              stopProgressTracking();
-              if (isRepeat) { playerRef.current.seekTo(0); playerRef.current.playVideo(); }
-              else { nextSong(); }
-            }
-          },
-          onError: () => { setIsBuffering(false); nextSong(); },
-        },
-      });
-    };
-    return () => stopProgressTracking();
+    const fn = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
   }, []);
 
   function startProgressTracking() {
@@ -70,55 +50,77 @@ export default function App() {
       }
     }, 1000);
   }
-
   function stopProgressTracking() {
     if (progressInterval.current) { clearInterval(progressInterval.current); progressInterval.current = null; }
   }
 
-  // ── Volume sync ───────────────────────────────────────
+  function autoNext() {
+    const list = songsRef.current;
+    const cur  = currentSongRef.current;
+    if (!list.length) return;
+    if (isRepeatRef.current) { playerRef.current?.seekTo(0); playerRef.current?.playVideo(); return; }
+    if (isShuffleRef.current) { playSongFn.current?.(list[Math.floor(Math.random() * list.length)]); return; }
+    const idx = list.findIndex(s => s.id === cur?.id);
+    playSongFn.current?.(list[(idx + 1) % list.length]);
+  }
+
+  useEffect(() => {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+    window.onYouTubeIframeAPIReady = () => {
+      playerRef.current = new window.YT.Player("yt-player", {
+        height: "0", width: "0",
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, modestbranding: 1, rel: 0 },
+        events: {
+          onReady: e => { e.target.setVolume(80); },
+          onStateChange: e => {
+            const S = window.YT.PlayerState;
+            if (e.data === S.PLAYING)   { setIsPlaying(true);  setIsBuffering(false); startProgressTracking(); }
+            else if (e.data === S.PAUSED)    { setIsPlaying(false); stopProgressTracking(); }
+            else if (e.data === S.BUFFERING) { setIsBuffering(true); }
+            else if (e.data === S.ENDED)     { stopProgressTracking(); autoNext(); }
+          },
+          onError: () => { setIsBuffering(false); autoNext(); },
+        },
+      });
+    };
+    return () => stopProgressTracking();
+  }, []);
+
   useEffect(() => {
     if (!playerRef.current?.setVolume) return;
-    if (isMuted) { playerRef.current.mute(); }
-    else { playerRef.current.unMute(); playerRef.current.setVolume(volume * 100); }
+    isMuted ? playerRef.current.mute() : (playerRef.current.unMute(), playerRef.current.setVolume(volume * 100));
     localStorage.setItem("sw_volume", volume.toString());
   }, [volume, isMuted]);
 
-  // ── Media keys ────────────────────────────────────────
   useEffect(() => {
     if (!currentSong || !("mediaSession" in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title, artist: currentSong.artist,
       artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
     });
-    navigator.mediaSession.setActionHandler("play", togglePlay);
-    navigator.mediaSession.setActionHandler("pause", togglePlay);
-    navigator.mediaSession.setActionHandler("nexttrack", nextSong);
-    navigator.mediaSession.setActionHandler("previoustrack", prevSong);
+    navigator.mediaSession.setActionHandler("play",          () => togglePlay());
+    navigator.mediaSession.setActionHandler("pause",         () => togglePlay());
+    navigator.mediaSession.setActionHandler("nexttrack",     () => nextSong());
+    navigator.mediaSession.setActionHandler("previoustrack", () => prevSong());
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }, [currentSong]);
 
-  useEffect(() => {
-    if (songs.length > 0) prefetchSongs(songs.slice(0, 5));
-  }, [songs]);
+  useEffect(() => { if (songs.length > 0) prefetchSongs(songs.slice(0, 5)); }, [songs]);
 
-  // ── On mount ──────────────────────────────────────────
   useEffect(() => {
     loadTrending();
     try {
-      const saved = localStorage.getItem("sw_current_song");
-      if (saved) setCurrentSong(JSON.parse(saved));
-      const savedVol = localStorage.getItem("sw_volume");
-      if (savedVol) setVolume(parseFloat(savedVol));
+      const s = localStorage.getItem("sw_current_song"); if (s) setCurrentSong(JSON.parse(s));
+      const v = localStorage.getItem("sw_volume");       if (v) setVolume(parseFloat(v));
     } catch (e) {}
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   async function loadTrending() {
     setIsLoading(true);
-    const trending = await getTrending();
-    setSongs(trending);
+    setSongs(await getTrending());
     setIsLoading(false);
   }
 
@@ -127,8 +129,7 @@ export default function App() {
     if (!query.trim()) { loadTrending(); return; }
     setIsLoading(true);
     setCurrentPage("search");
-    const results = await searchSongs(query);
-    setSongs(results);
+    setSongs(await searchSongs(query));
     setIsLoading(false);
   }
 
@@ -137,30 +138,29 @@ export default function App() {
     setCurrentSong(song);
     setProgress(0);
     setIsBuffering(true);
-    if (playerRef.current?.loadVideoById) {
-      playerRef.current.loadVideoById(song.youtubeId);
-    }
+    playerRef.current?.loadVideoById?.(song.youtubeId);
   }
+  playSongFn.current = playSong;
 
   function togglePlay() {
-    if (!currentSong) { if (songs.length > 0) playSong(songs[0]); return; }
-    if (!playerRef.current) return;
-    if (isPlaying) { playerRef.current.pauseVideo(); }
-    else { playerRef.current.playVideo(); }
+    if (!currentSong) { if (songsRef.current.length > 0) playSong(songsRef.current[0]); return; }
+    isPlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
   }
 
   function nextSong() {
-    if (!songs.length) return;
-    if (isShuffle) { playSong(songs[Math.floor(Math.random() * songs.length)]); return; }
-    const idx = songs.findIndex((s) => s.id === currentSong?.id);
-    playSong(songs[(idx + 1) % songs.length]);
+    const list = songsRef.current, cur = currentSongRef.current;
+    if (!list.length) return;
+    if (isShuffle) { playSong(list[Math.floor(Math.random() * list.length)]); return; }
+    const idx = list.findIndex(s => s.id === cur?.id);
+    playSong(list[(idx + 1) % list.length]);
   }
 
   function prevSong() {
-    if (progress > 3) { playerRef.current?.seekTo(0); return; }
-    if (!songs.length) return;
-    const idx = songs.findIndex((s) => s.id === currentSong?.id);
-    playSong(songs[(idx - 1 + songs.length) % songs.length]);
+    if (progress > 3) { playerRef.current?.seekTo(0); setProgress(0); return; }
+    const list = songsRef.current, cur = currentSongRef.current;
+    if (!list.length) return;
+    const idx = list.findIndex(s => s.id === cur?.id);
+    playSong(list[(idx - 1 + list.length) % list.length]);
   }
 
   function seekTo(pct) {
@@ -170,11 +170,7 @@ export default function App() {
   }
 
   function toggleLike(id) {
-    setLikedSongs((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setLikedSongs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   const sharedProps = {
@@ -189,255 +185,217 @@ export default function App() {
 
   return (
     <>
-      {/* Hidden YouTube Player */}
       <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, pointerEvents: "none" }}>
         <div id="yt-player" />
       </div>
-
       {isMobile ? <MobileLayout {...sharedProps} /> : <DesktopLayout {...sharedProps} />}
     </>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   DESKTOP LAYOUT — exactly like Spotify
-   Left sidebar (fixed) + scrollable main + bottom player
-════════════════════════════════════════════════════════ */
 function DesktopLayout(props) {
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      height: "100vh",
-      background: "#0a0a0f",
-      overflow: "hidden",
-    }}>
-      {/* Top: sidebar + main */}
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0a0a0f", overflow: "hidden" }}>
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <Sidebar
-          currentPage={props.currentPage}
-          setCurrentPage={props.setCurrentPage}
-          playlists={props.playlists}
-          likedCount={props.likedSongs.size}
-          isMobile={false}
-        />
+        <Sidebar currentPage={props.currentPage} setCurrentPage={props.setCurrentPage} playlists={props.playlists} likedCount={props.likedSongs.size} isMobile={false} />
         <MainContent {...props} />
       </div>
-      {/* Bottom: player always visible */}
       <Player {...props} />
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   MOBILE LAYOUT — exactly like JioSaavn / Spotify mobile
-   Top header + scrollable content + mini player + bottom nav
-════════════════════════════════════════════════════════ */
 function MobileLayout(props) {
   const { currentPage, setCurrentPage, likedSongs } = props;
-
+  const [showFullPlayer, setShowFullPlayer] = useState(false);
+  const [showDrawer,     setShowDrawer]     = useState(false);
   const tabs = [
-    { id: "home",    icon: HomeIcon,    label: "Home" },
-    { id: "search",  icon: SearchIcon,  label: "Search" },
-    { id: "library", icon: LibraryIcon, label: "Library" },
-    { id: "liked",   icon: HeartIcon,   label: "Liked" },
+    { id: "home",    label: "Home",    Icon: HomeIcon },
+    { id: "search",  label: "Search",  Icon: SearchIcon },
+    { id: "library", label: "Library", Icon: LibraryIcon },
+    { id: "liked",   label: "Liked",   Icon: HeartIcon },
   ];
+  const pageTitle = { home: "Good vibes 🎵", search: "Discover", library: "Library", liked: "Liked Songs" }[currentPage] || "SoundWave";
 
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      height: "100vh",
-      height: "100dvh",   /* dynamic viewport height — fixes iOS safari */
-      background: "#0a0a0f",
-      overflow: "hidden",
-    }}>
-      {/* Mobile Top Header */}
-      <MobileHeader {...props} />
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
+        </div>
+        <button onClick={() => setShowDrawer(true)}
+          style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
 
-      {/* Scrollable Content — FULL remaining height */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
         <MainContent {...props} />
       </div>
 
-      {/* Mini Player — above bottom nav, only when song exists */}
-      {props.currentSong && <MiniPlayer {...props} />}
+      {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
-      {/* Bottom Nav */}
-      <nav style={{
-        display: "flex",
-        background: "#111118",
-        borderTop: "1px solid #1e1e2e",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        flexShrink: 0,
-      }}>
-        {tabs.map(tab => {
-          const active = currentPage === tab.id;
-          const Icon = tab.icon;
+      <nav style={{ display: "flex", background: "#111118", borderTop: "1px solid #1e1e2e", paddingBottom: "env(safe-area-inset-bottom,0px)", flexShrink: 0 }}>
+        {tabs.map(({ id, label, Icon }) => {
+          const active = currentPage === id;
           return (
-            <button key={tab.id} onClick={() => setCurrentPage(tab.id)}
-              style={{
-                flex: 1, display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                gap: 3, padding: "10px 0",
-                background: "none", border: "none", cursor: "pointer",
-                color: active ? "#1db954" : "#6b7280",
-                transition: "color 0.2s",
-              }}>
+            <button key={id} onClick={() => setCurrentPage(id)}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: active ? "#1db954" : "#6b7280" }}>
               <Icon size={22} active={active} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "inherit", letterSpacing: 0.2 }}>
-                {tab.label}
-              </span>
+              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "inherit" }}>{label}</span>
             </button>
           );
         })}
       </nav>
+
+      {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
+      {showDrawer     && <MobileDrawer    {...props} onClose={() => setShowDrawer(false)} />}
     </div>
   );
 }
 
-/* ── Mobile Header ───────────────────────────────────── */
-function MobileHeader({ currentPage, searchQuery }) {
-  const pageTitle = {
-    home: "Good vibes 🎵",
-    search: "Discover",
-    library: "Your Library",
-    liked: "Liked Songs",
-    downloads: "Downloads",
-  }[currentPage] || "SoundWave";
-
-  return (
-    <header style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "16px 20px 12px",
-      background: "#0a0a0f",
-      flexShrink: 0,
-    }}>
-      <div>
-        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, letterSpacing: 0.5, marginBottom: 2 }}>
-          SOUNDWAVE
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: "#ffffff", letterSpacing: -0.5 }}>
-          {pageTitle}
-        </div>
-      </div>
-      <div style={{
-        width: 38, height: 38, borderRadius: "50%",
-        background: "linear-gradient(135deg,#1db954,#169c47)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 16,
-      }}>
-        👤
-      </div>
-    </header>
-  );
-}
-
-/* ── Mini Player (mobile only, above bottom nav) ─────── */
-function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, progress, duration }) {
+function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, onExpand }) {
   const pct = duration ? (progress / duration) * 100 : 0;
-
   return (
-    <div style={{
-      margin: "0 10px 6px",
-      background: "#1a1a2e",
-      borderRadius: 14,
-      overflow: "hidden",
-      flexShrink: 0,
-      boxShadow: "0 -2px 20px rgba(0,0,0,0.4)",
-    }}>
-      {/* Thin progress line at top */}
+    <div style={{ margin: "0 8px 6px", background: "#1c1c2e", borderRadius: 14, overflow: "hidden", flexShrink: 0, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }}>
       <div style={{ height: 2, background: "#2a2a3e" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: "#1db954", transition: "width 1s linear" }} />
       </div>
-
-      <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 12 }}>
-        {/* Thumbnail */}
-        <img
-          src={currentSong.thumbnail}
-          alt={currentSong.title}
-          style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
-        />
-
-        {/* Song info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 14, fontWeight: 600, color: "#ffffff",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {currentSong.title}
-          </div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {currentSong.artist}
-          </div>
+      <div style={{ display: "flex", alignItems: "center", padding: "10px 12px", gap: 10 }}>
+        <img src={currentSong.thumbnail} alt={currentSong.title} onClick={onExpand}
+          style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", flexShrink: 0, cursor: "pointer" }} />
+        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={onExpand}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.title}</div>
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.artist}</div>
         </div>
-
-        {/* Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button onClick={togglePlay}
-            style={{
-              width: 42, height: 42, borderRadius: "50%",
-              background: "#ffffff", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-            {isBuffering
-              ? <div style={{ width: 18, height: 18, border: "2px solid #0a0a0f", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              : isPlaying
-                ? <PauseIcon size={18} color="#0a0a0f" />
-                : <PlayIcon size={18} color="#0a0a0f" />}
-          </button>
-          <button onClick={nextSong}
-            style={{ width: 36, height: 36, borderRadius: "50%", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#a0a0b8" }}>
-            <NextIcon size={20} />
-          </button>
-        </div>
+        <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><PrevIcon size={20}/></button>
+        <button onClick={togglePlay} style={{ width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {isBuffering ? <div style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            : isPlaying ? <PauseIcon size={16} color="#000"/> : <PlayIcon size={16} color="#000"/>}
+        </button>
+        <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><NextIcon size={20}/></button>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
 
-/* ── SVG Icons ───────────────────────────────────────── */
-function HomeIcon({ size = 24, active }) {
+function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, seekTo, isShuffle, setIsShuffle, isRepeat, setIsRepeat, likedSongs, toggleLike, volume, setVolume, isMuted, setIsMuted, onClose }) {
+  const pct = duration ? (progress / duration) * 100 : 0;
+  const liked = currentSong && likedSongs.has(currentSong.id);
+  const fmt = s => !s || isNaN(s) ? "0:00" : `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg,#1a0a2e 0%,#0a0a1a 100%)", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", flexShrink: 0 }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 4 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#a0a0b8", letterSpacing: 0.5 }}>NOW PLAYING</span>
+        <button onClick={() => currentSong && toggleLike(currentSong.id)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: liked ? "#1db954" : "#6b7280", display: "flex", padding: 4 }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 40px" }}>
+        <img src={currentSong?.thumbnail} alt={currentSong?.title}
+          style={{ width: "100%", maxWidth: 300, aspectRatio: "1", borderRadius: 20, objectFit: "cover", boxShadow: "0 20px 60px rgba(0,0,0,0.7)" }} />
+      </div>
+
+      <div style={{ padding: "0 28px 32px", flexShrink: 0 }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong?.title}</div>
+          <div style={{ fontSize: 14, color: "#6b7280" }}>{currentSong?.artist}</div>
+        </div>
+
+        <div style={{ marginBottom: 24 }}>
+          <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
+            style={{ height: 4, background: "#2a2a3e", borderRadius: 4, cursor: "pointer", marginBottom: 8, position: "relative" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: "#fff", borderRadius: 4 }} />
+            <div style={{ position: "absolute", left: `${pct}%`, top: "50%", transform: "translate(-50%,-50%)", width: 14, height: 14, background: "#fff", borderRadius: "50%", pointerEvents: "none" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>{fmt(progress)}</span>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>{fmt(duration)}</span>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
+          <button onClick={() => setIsShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "#6b7280", padding: 8 }}><ShuffleIcon size={22}/></button>
+          <button onClick={prevSong}  style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={32}/></button>
+          <button onClick={togglePlay} style={{ width: 64, height: 64, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {isBuffering ? <div style={{ width: 24, height: 24, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
+              : isPlaying ? <PauseIcon size={28} color="#000"/> : <PlayIcon size={28} color="#000"/>}
+          </button>
+          <button onClick={nextSong}  style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={32}/></button>
+          <button onClick={() => setIsRepeat(r => !r)} style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "#6b7280", padding: 8 }}><RepeatIcon size={22}/></button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
+          <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))); setIsMuted(false); }}
+            style={{ flex: 1, height: 4, background: "#2a2a3e", borderRadius: 4, cursor: "pointer" }}>
+            <div style={{ width: `${isMuted ? 0 : volume * 100}%`, height: "100%", background: "#6b7280", borderRadius: 4 }} />
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </div>
+      </div>
+      <style>{`@keyframes spin2{to{transform:rotate(360deg)}}`}</style>
+    </div>
   );
 }
-function SearchIcon({ size = 24, active }) {
+
+function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onClose }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9998 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)" }} />
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 280, background: "#111118", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px" }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#1db954" }}>SoundWave</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 22 }}>✕</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
+          {[
+            { id: "home",      label: "Home",                        emoji: "🏠" },
+            { id: "search",    label: "Discover",                    emoji: "🔍" },
+            { id: "library",   label: "Library",                     emoji: "🎵" },
+            { id: "liked",     label: `Liked (${likedSongs.size})`,  emoji: "❤️" },
+            { id: "downloads", label: "Downloads",                   emoji: "⬇️" },
+          ].map(item => (
+            <button key={item.id} onClick={() => { setCurrentPage(item.id); onClose(); }}
+              style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", padding: "12px 14px", borderRadius: 10, background: currentPage === item.id ? "rgba(29,185,84,0.12)" : "none", border: "none", cursor: "pointer", color: currentPage === item.id ? "#1db954" : "#a0a0b8", fontSize: 15, fontWeight: currentPage === item.id ? 600 : 400, fontFamily: "inherit", textAlign: "left", marginBottom: 2 }}>
+              <span style={{ fontSize: 18 }}>{item.emoji}</span>{item.label}
+            </button>
+          ))}
+          <div style={{ padding: "16px 14px 8px", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#6b7280", textTransform: "uppercase" }}>Playlists</div>
+          {playlists.map(p => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 8, background: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{p.emoji}</div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "#f0f0ff" }}>{p.name}</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>{p.songIds?.length || 0} songs</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
-function LibraryIcon({ size = 24, active }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round">
-      <path d="M3 3h18v18H3z" /><path d="M3 9h18M9 21V9" />
-    </svg>
-  );
-}
-function HeartIcon({ size = 24, active }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-function PlayIcon({ size = 24, color = "currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z" /></svg>;
-}
-function PauseIcon({ size = 24, color = "currentColor" }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>;
-}
-function NextIcon({ size = 24 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>;
-}
-function PrevIcon({ size = 24 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>;
-}
+
+function HomeIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>; }
+function SearchIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active?"2.5":"2"} strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>; }
+function LibraryIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active?"2.5":"2"} strokeLinecap="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>; }
+function HeartIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>; }
+function PlayIcon({ size=24, color="currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z"/></svg>; }
+function PauseIcon({ size=24, color="currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>; }
+function NextIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>; }
+function PrevIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>; }
+function ShuffleIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>; }
+function RepeatIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>; }
