@@ -1,0 +1,13 @@
+[33m2e29587[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: complete app layout desktop and mobile
+[33m1576d10[m fix: complete mobile layout and player
+[33m82d088d[m fix: complete mobile responsive player and layout
+[33mb8eafc5[m fix: proper mobile layout
+[33m4e73090[m feat: mobile responsive
+[33m3d9b397[m fix: add manifest and update index.html
+[33m532dcde[m feat: PWA update
+[33md96e4b3[m feat: YouTube iFrame player for reliable streaming
+[33med39697[m fix: update stream handling
+[33m91e2691[m fix: add vercel.json routing config
+[33m6a31ae4[m fix: connect to live backend
+[33mc1b7d99[m fix: initialization error resolved
+[33mfe07d18[m SoundWave - initial commit

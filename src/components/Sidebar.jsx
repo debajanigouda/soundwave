@@ -10,9 +10,9 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
   ];
 
   return (
-    <aside style={{ width: 260, flexShrink: 0, background: "#12121a", borderRight: "1px solid #2a2a45", display: "flex", flexDirection: "column", overflow: "hidden", height: "100%" }}>
+    <aside style={{ background: "#12121a", borderRight: "1px solid #2a2a45", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Logo */}
-      <div style={{ padding: "28px 24px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+      <div style={{ padding: "28px 24px 20px", display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ width: 36, height: 36, background: GRAD, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>♪</div>
         <span style={{ fontFamily: "'Clash Display',sans-serif", fontSize: 20, fontWeight: 700, background: GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</span>
       </div>
@@ -20,12 +20,12 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
       {/* Nav */}
       <nav style={{ padding: "0 12px", flex: 1, overflowY: "auto" }}>
         <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#606080", padding: "0 12px" }}>Menu</div>
-        {navItems.map(item => (
+        {navItems.map((item) => (
           <button key={item.id} onClick={() => setCurrentPage(item.id)}
-            style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: currentPage === item.id ? "#6c63ff" : "#a0a0c0", background: currentPage === item.id ? "rgba(108,99,255,.15)" : "none", border: "none", width: "100%", textAlign: "left", fontSize: 14, fontWeight: 500, fontFamily: "inherit", marginBottom: 2 }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, cursor: "pointer", transition: "all .2s", color: currentPage === item.id ? "#6c63ff" : "#a0a0c0", background: currentPage === item.id ? "rgba(108,99,255,.15)" : "none", border: "none", width: "100%", textAlign: "left", fontSize: 14, fontWeight: 500, fontFamily: "inherit", marginBottom: 2 }}>
             {item.icon}
             {item.label}
-            {item.badge > 0 && (
+            {item.badge !== undefined && (
               <span style={{ marginLeft: "auto", background: "#6c63ff", color: "#fff", fontSize: 10, padding: "2px 7px", borderRadius: 20, fontWeight: 700 }}>{item.badge}</span>
             )}
           </button>
@@ -33,7 +33,7 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
 
         {/* Playlists */}
         <div style={{ marginTop: 24, marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#606080", padding: "0 12px" }}>Playlists</div>
-        {playlists.map(p => (
+        {playlists.map((p) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}
             onMouseEnter={e => e.currentTarget.style.background = "#1a1a28"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}>
@@ -44,6 +44,10 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
             </div>
           </div>
         ))}
+
+        <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: "#606080", background: "none", border: "none", width: "100%", fontSize: 13, fontFamily: "inherit", marginTop: 4 }}>
+          <span style={{ fontSize: 18 }}>+</span> New Playlist
+        </button>
       </nav>
     </aside>
   );
