@@ -4,6 +4,9 @@ import MainContent from "./components/MainContent";
 import Player from "./components/Player";
 import { PLAYLISTS, GENRES } from "./data/songs";
 import { searchSongs, getTrending, prefetchSongs } from "./api";
+import { supabase } from "./supabase";
+import { getLikedSongs, likeSong, unlikeSong, addToHistory } from "./db";
+import Auth from "./components/Auth";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
@@ -21,6 +24,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const playerRef = useRef(null);
   const progressInterval = useRef(null);
@@ -118,6 +123,25 @@ export default function App() {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
+  useEffect(() => {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setUser(session?.user ?? null);
+    setAuthLoading(false);
+    if (session?.user) loadUserData(session.user.id);
+  });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+    if (session?.user) loadUserData(session.user.id);
+    else setLikedSongs(new Set());
+  });
+  return () => subscription.unsubscribe();
+}, []);
+
+async function loadUserData(userId) {
+  const liked = await getLikedSongs(userId);
+  setLikedSongs(new Set(liked.map(s => s.song_id)));
+}
+
   async function loadTrending() {
     setIsLoading(true);
     setSongs(await getTrending());
@@ -133,14 +157,14 @@ export default function App() {
     setIsLoading(false);
   }
 
-  function playSong(song) {
-    if (!song) return;
-    setCurrentSong(song);
-    setProgress(0);
-    setIsBuffering(true);
-    playerRef.current?.loadVideoById?.(song.youtubeId);
-  }
-  playSongFn.current = playSong;
+function playSong(song) {
+  if (!song) return;
+  setCurrentSong(song);
+  setProgress(0);
+  setIsBuffering(true);
+  playerRef.current?.loadVideoById(song.youtubeId);
+  if (user) addToHistory(user.id, song);
+}
 
   function togglePlay() {
     if (!currentSong) { if (songsRef.current.length > 0) playSong(songsRef.current[0]); return; }
@@ -183,7 +207,21 @@ export default function App() {
     handleGenreSearch: handleSearch, isMobile,
   };
 
-  return (
+if (authLoading) {
+    return (
+      <div style={{ height: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 16px" }}>♪</div>
+          <div style={{ color: "#606080", fontSize: 14 }}>Loading SoundWave...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth onLogin={setUser}/>;
+  }
+  return ( 
     <>
       <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, pointerEvents: "none" }}>
         <div id="yt-player" />
