@@ -165,6 +165,7 @@ function playSong(song) {
   playerRef.current?.loadVideoById(song.youtubeId);
   if (user) addToHistory(user.id, song);
 }
+playSongFn.current = playSong;
 
   function togglePlay() {
     if (!currentSong) { if (songsRef.current.length > 0) playSong(songsRef.current[0]); return; }
@@ -244,11 +245,38 @@ if (authLoading) {
 
 function DesktopLayout(props) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0a0a0f", overflow: "hidden" }}>
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100vh", background: "#0a0a0f", overflow: "hidden" }}>
+      
+      {/* ✅ LOGOUT BUTTON HERE */}
+      <button 
+        onClick={() => supabase.auth.signOut()}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 20,
+          background: "#ff4d4d",
+          color: "#fff",
+          border: "none",
+          padding: "6px 12px",
+          borderRadius: 6,
+          cursor: "pointer",
+          zIndex: 1000
+        }}
+      >
+        Logout
+      </button>
+
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <Sidebar currentPage={props.currentPage} setCurrentPage={props.setCurrentPage} playlists={props.playlists} likedCount={props.likedSongs.size} isMobile={false} />
+        <Sidebar 
+          currentPage={props.currentPage} 
+          setCurrentPage={props.setCurrentPage} 
+          playlists={props.playlists} 
+          likedCount={props.likedSongs.size} 
+          isMobile={false} 
+        />
         <MainContent {...props} />
       </div>
+
       <Player {...props} />
     </div>
   );
@@ -272,7 +300,21 @@ function MobileLayout(props) {
         <div>
           <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
+          <button 
+        onClick={() => supabase.auth.signOut()}
+        style={{
+          background: "#ff4d4d",
+          color: "#fff",
+          border: "none",
+          padding: "6px 10px",
+          borderRadius: 6,
+          cursor: "pointer"
+          }}
+          >
+            Logout
+            </button>
         </div>
+        
         <button onClick={() => setShowDrawer(true)}
           style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
