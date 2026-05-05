@@ -193,9 +193,20 @@ function playSong(song) {
     setProgress(Math.floor(pct * duration));
   }
 
-  function toggleLike(id) {
-    setLikedSongs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
+  async function toggleLike(id) {
+  const song = songs.find(s => s.id === id);
+  setLikedSongs(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) {
+      next.delete(id);
+      if (user) unlikeSong(user.id, id);
+    } else {
+      next.add(id);
+      if (user && song) likeSong(user.id, song);
+    }
+    return next;
+  });
+}
 
   const sharedProps = {
     songs, currentSong, isPlaying, isBuffering, isLoading,
