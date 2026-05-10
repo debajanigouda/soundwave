@@ -57,9 +57,7 @@ export default function Auth({ onLogin }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 420, background: "#12121a", borderRadius: 24, padding: "36px 32px", border: "1px solid #2a2a45", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
-
+<div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, backgroundImage: "radial-gradient(ellipse at 50% 0%, rgba(108,99,255,0.15) 0%, transparent 70%)" }}>     <div style={{ width: "100%", maxWidth: 460, background: "#12121a", borderRadius: 24, padding: "40px 40px", border: "1px solid #2a2a45", boxShadow: "0 20px 60px rgba(0,0,0,0.5)" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ width: 70, height: 70, background: GRAD, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34, margin: "0 auto 14px" }}>♪</div>

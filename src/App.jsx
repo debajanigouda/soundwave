@@ -217,6 +217,8 @@ playSongFn.current = playSong;
     currentPage, setCurrentPage, searchQuery, handleSearch,
     playlists: PLAYLISTS, genres: GENRES, loadTrending,
     handleGenreSearch: handleSearch, isMobile,
+    onLogout: () => supabase.auth.signOut(),
+user,
   };
 
 if (authLoading) {
@@ -245,38 +247,17 @@ if (authLoading) {
 
 function DesktopLayout(props) {
   return (
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100vh", background: "#0a0a0f", overflow: "hidden" }}>
-      
-      {/* ✅ LOGOUT BUTTON HERE */}
-      <button 
-        onClick={() => supabase.auth.signOut()}
-        style={{
-          position: "absolute",
-          top: 10,
-          right: 20,
-          background: "#ff4d4d",
-          color: "#fff",
-          border: "none",
-          padding: "6px 12px",
-          borderRadius: 6,
-          cursor: "pointer",
-          zIndex: 1000
-        }}
-      >
-        Logout
-      </button>
-
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0a0a0f", overflow: "hidden" }}>
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <Sidebar 
-          currentPage={props.currentPage} 
-          setCurrentPage={props.setCurrentPage} 
-          playlists={props.playlists} 
-          likedCount={props.likedSongs.size} 
-          isMobile={false} 
+        <Sidebar
+          currentPage={props.currentPage}
+          setCurrentPage={props.setCurrentPage}
+          playlists={props.playlists}
+          likedCount={props.likedSongs.size}
+          onLogout={props.onLogout}
         />
         <MainContent {...props} />
       </div>
-
       <Player {...props} />
     </div>
   );
@@ -300,21 +281,7 @@ function MobileLayout(props) {
         <div>
           <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
-          <button 
-        onClick={() => supabase.auth.signOut()}
-        style={{
-          background: "#ff4d4d",
-          color: "#fff",
-          border: "none",
-          padding: "6px 10px",
-          borderRadius: 6,
-          cursor: "pointer"
-          }}
-          >
-            Logout
-            </button>
         </div>
-        
         <button onClick={() => setShowDrawer(true)}
           style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -322,10 +289,7 @@ function MobileLayout(props) {
           </svg>
         </button>
       </div>
-
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
-        <MainContent {...props} />
-      </div>
+      
 
       {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
@@ -343,8 +307,7 @@ function MobileLayout(props) {
       </nav>
 
       {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
-      {showDrawer     && <MobileDrawer    {...props} onClose={() => setShowDrawer(false)} />}
-    </div>
+{showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}    </div>
   );
 }
 
@@ -442,7 +405,7 @@ function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nex
   );
 }
 
-function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onClose }) {
+function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onClose, onLogout }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9998 }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)" }} />
@@ -453,11 +416,11 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
           {[
-            { id: "home",      label: "Home",                        emoji: "🏠" },
-            { id: "search",    label: "Discover",                    emoji: "🔍" },
-            { id: "library",   label: "Library",                     emoji: "🎵" },
-            { id: "liked",     label: `Liked (${likedSongs.size})`,  emoji: "❤️" },
-            { id: "downloads", label: "Downloads",                   emoji: "⬇️" },
+            { id: "home",      label: "Home",                       emoji: "🏠" },
+            { id: "search",    label: "Discover",                   emoji: "🔍" },
+            { id: "library",   label: "Library",                    emoji: "🎵" },
+            { id: "liked",     label: `Liked (${likedSongs.size})`, emoji: "❤️" },
+            { id: "downloads", label: "Downloads",                  emoji: "⬇️" },
           ].map(item => (
             <button key={item.id} onClick={() => { setCurrentPage(item.id); onClose(); }}
               style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", padding: "12px 14px", borderRadius: 10, background: currentPage === item.id ? "rgba(29,185,84,0.12)" : "none", border: "none", cursor: "pointer", color: currentPage === item.id ? "#1db954" : "#a0a0b8", fontSize: 15, fontWeight: currentPage === item.id ? 600 : 400, fontFamily: "inherit", textAlign: "left", marginBottom: 2 }}>
@@ -474,6 +437,17 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Logout at bottom of drawer */}
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a3e", flexShrink: 0 }}>
+          <button onClick={() => { onLogout(); onClose(); }}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 10, background: "none", border: "1px solid #2a2a3e", cursor: "pointer", color: "#6b7280", fontSize: 14, fontFamily: "inherit" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor="#ff6b6b"; e.currentTarget.style.color="#ff6b6b"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2a3e"; e.currentTarget.style.color="#6b7280"; }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Logout
+          </button>
         </div>
       </div>
     </div>

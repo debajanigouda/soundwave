@@ -1,6 +1,6 @@
 const GRAD = "linear-gradient(135deg,#6c63ff,#ff6b9d)";
 
-export default function Sidebar({ currentPage, setCurrentPage, playlists, likedCount }) {
+export default function Sidebar({ currentPage, setCurrentPage, playlists, likedCount, onLogout }) {
   const navItems = [
     { id: "home",      label: "Home",         icon: <HomeIcon /> },
     { id: "search",    label: "Discover",     icon: <SearchIcon /> },
@@ -49,6 +49,15 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
           <span style={{ fontSize: 18 }}>+</span> New Playlist
         </button>
       </nav>
+      {/* Logout Button */}
+      <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a45", flexShrink: 0 }}>
+        <button onClick={onLogout}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 10, background: "none", border: "1px solid #2a2a45", cursor: "pointer", color: "#606080", fontSize: 13, fontFamily: "inherit", transition: "all .2s" }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "#ff6b6b"; e.currentTarget.style.color = "#ff6b6b"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a45"; e.currentTarget.style.color = "#606080"; }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </button>
     </aside>
   );
 }
