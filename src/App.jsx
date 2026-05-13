@@ -30,6 +30,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // Sleep timer
+  const [sleepMinutes, setSleepMinutes] = useState(null);
+  const [sleepRemaining, setSleepRemaining] = useState(null);
+  const sleepRef = useRef(null);
+
   const playerRef = useRef(null);
   const progressInterval = useRef(null);
   const songsRef = useRef(songs);
@@ -48,6 +53,29 @@ export default function App() {
     window.addEventListener("resize", fn);
     return () => window.removeEventListener("resize", fn);
   }, []);
+
+  // Sleep timer logic
+  useEffect(() => {
+    if (sleepMinutes === null) {
+      clearInterval(sleepRef.current);
+      setSleepRemaining(null);
+      return;
+    }
+    setSleepRemaining(sleepMinutes * 60);
+    clearInterval(sleepRef.current);
+    sleepRef.current = setInterval(() => {
+      setSleepRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(sleepRef.current);
+          playerRef.current?.pauseVideo();
+          setSleepMinutes(null);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(sleepRef.current);
+  }, [sleepMinutes]);
 
   function startProgressTracking() {
     stopProgressTracking();
@@ -216,6 +244,16 @@ export default function App() {
     });
   }
 
+  function shareSong(song) {
+    if (!song) return;
+    const text = `🎵 Listening to "${song.title}" by ${song.artist} on SoundWave!\nhttps://soundwave-chi.vercel.app`;
+    if (navigator.share) {
+      navigator.share({ title: song.title, text, url: "https://soundwave-chi.vercel.app" }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).then(() => alert("Link copied to clipboard!"));
+    }
+  }
+
   const sharedProps = {
     songs, currentSong, isPlaying, isBuffering, isLoading,
     likedSongs, playSong, toggleLike, togglePlay, nextSong, prevSong,
@@ -225,7 +263,8 @@ export default function App() {
     playlists: PLAYLISTS, genres: GENRES, loadTrending,
     handleGenreSearch: handleSearch, isMobile,
     onLogout: () => supabase.auth.signOut(),
-    user,
+    user, shareSong,
+    sleepMinutes, setSleepMinutes, sleepRemaining,
   };
 
   if (authLoading) {
@@ -276,16 +315,12 @@ function MobileLayout(props) {
   ];
 
   const pageTitle = {
-    home: "Good vibes 🎵",
-    search: "Discover",
-    library: "Library",
-    liked: "Liked Songs",
+    home: "Good vibes 🎵", search: "Discover",
+    library: "Library", liked: "Liked Songs",
   }[currentPage] || "SoundWave";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
-
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
@@ -301,17 +336,12 @@ function MobileLayout(props) {
         </button>
       </div>
 
-      {/* Main scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
         <MainContent {...props} />
       </div>
 
-      {/* Mini player */}
-      {props.currentSong && (
-        <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />
-      )}
+      {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
-      {/* Bottom nav */}
       <nav style={{ display: "flex", background: "#111118", borderTop: "1px solid #1e1e2e", paddingBottom: "env(safe-area-inset-bottom, 8px)", flexShrink: 0 }}>
         {tabs.map(({ id, label, Icon }) => {
           const active = currentPage === id;
@@ -331,26 +361,14 @@ function MobileLayout(props) {
   );
 }
 
-/* ── MINI PLAYER (fixed & clean) ── */
 function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, onExpand }) {
   const pct = duration ? (progress / duration) * 100 : 0;
   return (
-    <div style={{
-      margin: "0 10px 6px",
-      background: "linear-gradient(135deg, #1c1c2e, #16162a)",
-      borderRadius: 18,
-      overflow: "hidden",
-      flexShrink: 0,
-      boxShadow: "0 -2px 20px rgba(0,0,0,0.4)",
-      border: "1px solid rgba(255,255,255,0.06)",
-    }}>
-      {/* Progress bar */}
+    <div style={{ margin: "0 10px 6px", background: "linear-gradient(135deg, #1c1c2e, #16162a)", borderRadius: 18, overflow: "hidden", flexShrink: 0, boxShadow: "0 -2px 20px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
       <div style={{ height: 2, background: "rgba(255,255,255,0.08)" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, #1db954, #1ed760)", transition: "width 1s linear", borderRadius: 2 }} />
       </div>
-
       <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 12 }}>
-        {/* Album art */}
         <div style={{ position: "relative", flexShrink: 0 }} onClick={onExpand}>
           <img src={currentSong.thumbnail} alt={currentSong.title}
             style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", display: "block", cursor: "pointer" }} />
@@ -360,27 +378,19 @@ function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong,
             </div>
           )}
         </div>
-
-        {/* Song info */}
         <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={onExpand}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>{currentSong.title}</div>
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.artist}</div>
         </div>
-
-        {/* Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}>
-            <PrevIcon size={18} />
-          </button>
+          <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}><PrevIcon size={18} /></button>
           <button onClick={togglePlay}
             style={{ width: 42, height: 42, borderRadius: "50%", background: "#1db954", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 12px rgba(29,185,84,0.4)" }}>
             {isBuffering
               ? <div style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
               : isPlaying ? <PauseIcon size={18} color="#000" /> : <PlayIcon size={18} color="#000" />}
           </button>
-          <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}>
-            <NextIcon size={18} />
-          </button>
+          <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}><NextIcon size={18} /></button>
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -388,41 +398,99 @@ function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong,
   );
 }
 
-/* ── FULL SCREEN PLAYER (fixed album art + layout) ── */
-function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, seekTo, isShuffle, setIsShuffle, isRepeat, setIsRepeat, likedSongs, toggleLike, volume, setVolume, isMuted, setIsMuted, onClose }) {
+function FullScreenPlayer({
+  currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong,
+  progress, duration, seekTo, isShuffle, setIsShuffle, isRepeat, setIsRepeat,
+  likedSongs, toggleLike, volume, setVolume, isMuted, setIsMuted, onClose,
+  shareSong, songs, playSong, sleepMinutes, setSleepMinutes, sleepRemaining,
+}) {
+  const [showQueue, setShowQueue] = useState(false);
+  const [showSleepPicker, setShowSleepPicker] = useState(false);
   const pct = duration ? (progress / duration) * 100 : 0;
   const liked = currentSong && likedSongs.has(currentSong.id);
   const fmt = s => !s || isNaN(s) ? "0:00" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const fmtSleep = s => s ? `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}` : "";
+  const currentIdx = songs.findIndex(s => s.id === currentSong?.id);
+  const upNext = songs.slice(currentIdx + 1, currentIdx + 8);
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "#0a0a14",
-      display: "flex", flexDirection: "column",
-      overflow: "hidden",
-    }}>
-      {/* Blurred background from album art */}
-      <div style={{
-        position: "absolute", inset: 0, zIndex: 0,
-        backgroundImage: `url(${currentSong?.thumbnail})`,
-        backgroundSize: "cover", backgroundPosition: "center",
-        filter: "blur(40px) brightness(0.25)",
-        transform: "scale(1.1)",
-      }} />
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#0a0a14", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Blurred bg */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, backgroundImage: `url(${currentSong?.thumbnail})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(40px) brightness(0.25)", transform: "scale(1.1)" }} />
 
-      {/* Content */}
+      {/* Queue panel overlay */}
+      {showQueue && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 12px", flexShrink: 0 }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Up Next</div>
+            <button onClick={() => setShowQueue(false)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+          </div>
+          {/* Now playing */}
+          {currentSong && (
+            <div style={{ padding: "0 20px 8px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#1db954", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Now Playing</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
+                <img src={currentSong.thumbnail} alt={currentSong.title} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover", border: "2px solid #1db954" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1db954", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.title}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{currentSong.artist}</div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 32px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Up Next</div>
+            {upNext.length === 0 && <div style={{ color: "#6b7280", fontSize: 14, padding: "20px 0" }}>No more songs in queue</div>}
+            {upNext.map(s => (
+              <div key={s.id} onClick={() => { playSong(s); setShowQueue(false); }}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", cursor: "pointer", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <img src={s.thumbnail} alt={s.title} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{s.artist}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sleep timer picker */}
+      {showSleepPicker && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 11, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Sleep Timer</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 28 }}>Music will stop after selected time</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", maxWidth: 280 }}>
+            {[5, 10, 15, 20, 30, 45, 60].map(m => (
+              <button key={m} onClick={() => { setSleepMinutes(m); setShowSleepPicker(false); }}
+                style={{ padding: "14px 0", borderRadius: 14, border: sleepMinutes === m ? "2px solid #1db954" : "1px solid rgba(255,255,255,0.12)", background: sleepMinutes === m ? "rgba(29,185,84,0.15)" : "rgba(255,255,255,0.06)", color: sleepMinutes === m ? "#1db954" : "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                {m} minutes
+              </button>
+            ))}
+            {sleepMinutes && (
+              <button onClick={() => { setSleepMinutes(null); setShowSleepPicker(false); }}
+                style={{ padding: "14px 0", borderRadius: 14, border: "1px solid #ff6b6b", background: "rgba(255,107,107,0.1)", color: "#ff6b6b", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Cancel Timer
+              </button>
+            )}
+          </div>
+          <button onClick={() => setShowSleepPicker(false)} style={{ marginTop: 20, background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 14, fontFamily: "inherit" }}>Close</button>
+        </div>
+      )}
+
+      {/* Main content */}
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "0 0 env(safe-area-inset-bottom, 16px)" }}>
-
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px", flexShrink: 0 }}>
           <button onClick={onClose}
             style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
           </button>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: 2 }}>NOW PLAYING</div>
+            {sleepRemaining && (
+              <div style={{ fontSize: 11, color: "#1db954", marginTop: 2 }}>😴 {fmtSleep(sleepRemaining)}</div>
+            )}
           </div>
           <button onClick={() => currentSong && toggleLike(currentSong.id)}
             style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: liked ? "#1db954" : "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -432,29 +500,33 @@ function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nex
           </button>
         </div>
 
-        {/* Album art — perfectly square and centered */}
+        {/* Album art */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 32px" }}>
           <div style={{ width: "100%", maxWidth: 320, aspectRatio: "1/1", borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
-            <img src={currentSong?.thumbnail} alt={currentSong?.title}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <img src={currentSong?.thumbnail} alt={currentSong?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         </div>
 
-        {/* Song info + controls */}
-        <div style={{ flexShrink: 0, padding: "0 28px 20px" }}>
-
-          {/* Title & artist */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {currentSong?.title}
+        {/* Controls */}
+        <div style={{ flexShrink: 0, padding: "0 28px 16px" }}>
+          {/* Title + share */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+            <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong?.title}</div>
+              <div style={{ fontSize: 15, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>{currentSong?.artist}</div>
             </div>
-            <div style={{ fontSize: 15, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>{currentSong?.artist}</div>
+            <button onClick={() => shareSong(currentSong)}
+              style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </button>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress */}
           <div style={{ marginBottom: 20 }}>
-            <div
-              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
+            <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
               style={{ height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", marginBottom: 10, position: "relative" }}>
               <div style={{ width: `${pct}%`, height: "100%", background: "#fff", borderRadius: 4, transition: "width 1s linear" }} />
               <div style={{ position: "absolute", left: `${pct}%`, top: "50%", transform: "translate(-50%,-50%)", width: 14, height: 14, background: "#fff", borderRadius: "50%", boxShadow: "0 0 8px rgba(255,255,255,0.5)", pointerEvents: "none" }} />
@@ -466,47 +538,45 @@ function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nex
           </div>
 
           {/* Playback controls */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-            <button onClick={() => setIsShuffle(s => !s)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}>
-              <ShuffleIcon size={22} />
-            </button>
-            <button onClick={prevSong}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}>
-              <PrevIcon size={34} />
-            </button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <button onClick={() => setIsShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}><ShuffleIcon size={22} /></button>
+            <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={34} /></button>
             <button onClick={togglePlay}
               style={{ width: 68, height: 68, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 24px rgba(255,255,255,0.2)" }}>
               {isBuffering
                 ? <div style={{ width: 26, height: 26, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
                 : isPlaying ? <PauseIcon size={30} color="#000" /> : <PlayIcon size={30} color="#000" />}
             </button>
-            <button onClick={nextSong}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}>
-              <NextIcon size={34} />
-            </button>
-            <button onClick={() => setIsRepeat(r => !r)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}>
-              <RepeatIcon size={22} />
-            </button>
+            <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={34} /></button>
+            <button onClick={() => setIsRepeat(r => !r)} style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}><RepeatIcon size={22} /></button>
           </div>
 
-          {/* Volume */}
+          {/* Bottom row: volume + queue + sleep */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <button onClick={() => setIsMuted(m => !m)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                {isMuted ? <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-                : <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>}
+                {isMuted
+                  ? <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                  : <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>}
               </svg>
             </button>
-            <div
-              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); setIsMuted(false); }}
-              style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", position: "relative" }}>
+            <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); setIsMuted(false); }}
+              style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer" }}>
               <div style={{ width: `${isMuted ? 0 : volume * 100}%`, height: "100%", background: "rgba(255,255,255,0.7)", borderRadius: 4 }} />
             </div>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.4)">
-              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-            </svg>
+            {/* Queue btn */}
+            <button onClick={() => setShowQueue(true)}
+              style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "inherit" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </button>
+            {/* Sleep btn */}
+            <button onClick={() => setShowSleepPicker(true)}
+              style={{ background: sleepMinutes ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)", border: sleepMinutes ? "1px solid #1db954" : "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: sleepMinutes ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: 16, display: "flex", alignItems: "center" }}>
+              😴
+            </button>
           </div>
         </div>
       </div>
@@ -515,20 +585,15 @@ function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nex
   );
 }
 
-/* ── MOBILE DRAWER (with theme toggle) ── */
 function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onClose, onLogout }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9998 }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)" }} />
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 300, background: "#111118", display: "flex", flexDirection: "column", boxShadow: "4px 0 32px rgba(0,0,0,0.5)" }}>
-
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px" }}>
           <div style={{ fontSize: 20, fontWeight: 800, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, width: 34, height: 34, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
-
-        {/* Nav items */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px" }}>
           {[
             { id: "home",      label: "Home",                       emoji: "🏠" },
@@ -542,8 +607,6 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
               <span style={{ fontSize: 20 }}>{item.emoji}</span>{item.label}
             </button>
           ))}
-
-          {/* Playlists */}
           <div style={{ padding: "16px 14px 8px", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#6b7280", textTransform: "uppercase" }}>Playlists</div>
           {playlists.map(p => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10 }}>
@@ -555,18 +618,10 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
             </div>
           ))}
         </div>
-
-        {/* Theme toggle */}
-        <div style={{ padding: "12px 16px 0" }}>
-          <ThemeToggle />
-        </div>
-
-        {/* Logout */}
+        <div style={{ padding: "12px 16px 0" }}><ThemeToggle /></div>
         <div style={{ padding: "12px 16px 20px", flexShrink: 0 }}>
           <button onClick={() => { onLogout(); onClose(); }}
-            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 12, background: "none", border: "1px solid #2a2a3e", cursor: "pointer", color: "#6b7280", fontSize: 14, fontFamily: "inherit", transition: "all 0.2s" }}
-            onTouchStart={e => { e.currentTarget.style.borderColor = "#ff6b6b"; e.currentTarget.style.color = "#ff6b6b"; }}
-            onTouchEnd={e => { e.currentTarget.style.borderColor = "#2a2a3e"; e.currentTarget.style.color = "#6b7280"; }}>
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 12, background: "none", border: "1px solid #2a2a3e", cursor: "pointer", color: "#6b7280", fontSize: 14, fontFamily: "inherit" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
@@ -580,7 +635,6 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
   );
 }
 
-/* ── ICONS ── */
 function HomeIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>; }
 function SearchIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>; }
 function LibraryIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round"><path d="M3 3h18v18H3z" /><path d="M3 9h18M9 21V9" /></svg>; }
