@@ -6,16 +6,14 @@ export default function MainContent({
   isRepeat, setIsRepeat, playlists, genres, loadTrending, handleGenreSearch, isMobile,
 }) {
   return (
-    <div style={{
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      background: "#0a0a0f",
-      /* On desktop this div itself scrolls; on mobile the parent scrolls */
-overflowY: isMobile ? "auto" : "auto",
-      overflowX: "hidden",
-      WebkitOverflowScrolling: "touch",
-    }}>
+   <div style={{
+  display: "flex",
+  flexDirection: "column",
+  background: "#0a0a0f",
+  minHeight: "100%",   // ← key fix
+  overflowX: "hidden",
+  WebkitOverflowScrolling: "touch",
+}}>
       {/* Desktop search header */}
       {!isMobile && (
         <DesktopSearchHeader
