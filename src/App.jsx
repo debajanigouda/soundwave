@@ -310,7 +310,62 @@ function MobileLayout(props) {
 {showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}    </div>
   );
 }
+function MobileLayout(props) {
+  const { currentPage, setCurrentPage, likedSongs } = props;
+  const [showFullPlayer, setShowFullPlayer] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
+  const tabs = [
+    { id: "home",    label: "Home",    Icon: HomeIcon },
+    { id: "search",  label: "Search",  Icon: SearchIcon },
+    { id: "library", label: "Library", Icon: LibraryIcon },
+    { id: "liked",   label: "Liked",   Icon: HeartIcon },
+  ];
+  const pageTitle = { home: "Good vibes 🎵", search: "Discover", library: "Library", liked: "Liked Songs" }[currentPage] || "SoundWave";
 
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
+      
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
+        </div>
+        <button onClick={() => setShowDrawer(true)}
+          style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* ✅ THIS WAS MISSING — main content area */}
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <MainContent {...props} />
+      </div>
+
+      {/* Mini player sits above bottom nav */}
+      {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
+
+      {/* Bottom nav */}
+      <nav style={{ display: "flex", background: "#111118", borderTop: "1px solid #1e1e2e", paddingBottom: "env(safe-area-inset-bottom,0px)", flexShrink: 0 }}>
+        {tabs.map(({ id, label, Icon }) => {
+          const active = currentPage === id;
+          return (
+            <button key={id} onClick={() => setCurrentPage(id)}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: active ? "#1db954" : "#6b7280" }}>
+              <Icon size={22} active={active} />
+              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "inherit" }}>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
+      {showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}
+    </div>
+  );
+}
 function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, onExpand }) {
   const pct = duration ? (progress / duration) * 100 : 0;
   return (
@@ -414,6 +469,7 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
           <div style={{ fontSize: 20, fontWeight: 700, color: "#1db954" }}>SoundWave</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 22 }}>✕</button>
         </div>
+
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
           {[
             { id: "home",      label: "Home",                       emoji: "🏠" },
@@ -427,6 +483,7 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
               <span style={{ fontSize: 18 }}>{item.emoji}</span>{item.label}
             </button>
           ))}
+
           <div style={{ padding: "16px 14px 8px", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#6b7280", textTransform: "uppercase" }}>Playlists</div>
           {playlists.map(p => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10 }}>
@@ -439,16 +496,21 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
           ))}
         </div>
 
-        {/* Logout at bottom of drawer */}
+        {/* Logout at bottom */}
         <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a3e", flexShrink: 0 }}>
           <button onClick={() => { onLogout(); onClose(); }}
             style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 10, background: "none", border: "1px solid #2a2a3e", cursor: "pointer", color: "#6b7280", fontSize: 14, fontFamily: "inherit" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor="#ff6b6b"; e.currentTarget.style.color="#ff6b6b"; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2a3e"; e.currentTarget.style.color="#6b7280"; }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
             Logout
           </button>
         </div>
+
       </div>
     </div>
   );
