@@ -1,6 +1,12 @@
+import { useContext } from "react";
+import { ThemeContext } from "../ThemeContext";
+import ThemeToggle from "./ThemeToggle";
+
 const GRAD = "linear-gradient(135deg,#6c63ff,#ff6b9d)";
 
 export default function Sidebar({ currentPage, setCurrentPage, playlists, likedCount, onLogout }) {
+  const { darkMode } = useContext(ThemeContext);
+
   const navItems = [
     { id: "home",      label: "Home",         icon: <HomeIcon /> },
     { id: "search",    label: "Discover",     icon: <SearchIcon /> },
@@ -9,8 +15,21 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
     { id: "downloads", label: "Downloads",    icon: <DownloadIcon /> },
   ];
 
+  const bg        = darkMode ? "#12121a" : "#f8f8fc";
+  const border    = darkMode ? "#2a2a45" : "#e0e0ee";
+  const navActive = darkMode ? "rgba(108,99,255,.15)" : "rgba(108,99,255,.10)";
+  const navText   = darkMode ? "#a0a0c0" : "#666";
+  const subText   = darkMode ? "#606080" : "#999";
+  const itemBg    = darkMode ? "#1a1a28" : "#efeffa";
+  const nameColor = darkMode ? "#f0f0ff" : "#222";
+
   return (
-    <aside style={{ background: "#12121a", borderRight: "1px solid #2a2a45", display: "flex", flexDirection: "column", overflow: "hidden", width: 260, flexShrink: 0 }}>
+    <aside style={{
+      background: bg,
+      borderRight: `1px solid ${border}`,
+      display: "flex", flexDirection: "column",
+      overflow: "hidden", width: 260, flexShrink: 0,
+    }}>
 
       {/* Logo */}
       <div style={{ padding: "28px 24px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -20,10 +39,17 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
 
       {/* Nav */}
       <nav style={{ padding: "0 12px", flex: 1, overflowY: "auto" }}>
-        <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#606080", padding: "0 12px" }}>Menu</div>
+        <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: subText, padding: "0 12px" }}>Menu</div>
         {navItems.map((item) => (
           <button key={item.id} onClick={() => setCurrentPage(item.id)}
-            style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: currentPage === item.id ? "#6c63ff" : "#a0a0c0", background: currentPage === item.id ? "rgba(108,99,255,.15)" : "none", border: "none", width: "100%", textAlign: "left", fontSize: 14, fontWeight: 500, fontFamily: "inherit", marginBottom: 2 }}>
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+              color: currentPage === item.id ? "#6c63ff" : navText,
+              background: currentPage === item.id ? navActive : "none",
+              border: "none", width: "100%", textAlign: "left",
+              fontSize: 14, fontWeight: 500, fontFamily: "inherit", marginBottom: 2,
+            }}>
             {item.icon}
             {item.label}
             {item.badge !== undefined && item.badge > 0 && (
@@ -33,30 +59,36 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
         ))}
 
         {/* Playlists */}
-        <div style={{ marginTop: 24, marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: "#606080", padding: "0 12px" }}>Playlists</div>
+        <div style={{ marginTop: 24, marginBottom: 8, fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: subText, padding: "0 12px" }}>Playlists</div>
         {playlists.map((p) => (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#1a1a28"}
+          <div key={p.id}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}
+            onMouseEnter={e => e.currentTarget.style.background = itemBg}
             onMouseLeave={e => e.currentTarget.style.background = "none"}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{p.emoji}</div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#f0f0ff" }}>{p.name}</div>
-              <div style={{ fontSize: 11, color: "#606080" }}>{p.songIds?.length || 0} songs</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: nameColor }}>{p.name}</div>
+              <div style={{ fontSize: 11, color: subText }}>{p.songIds?.length || 0} songs</div>
             </div>
           </div>
         ))}
 
-        <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: "#606080", background: "none", border: "none", width: "100%", fontSize: 13, fontFamily: "inherit", marginTop: 4 }}>
+        <button style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer", color: subText, background: "none", border: "none", width: "100%", fontSize: 13, fontFamily: "inherit", marginTop: 4 }}>
           <span style={{ fontSize: 18 }}>+</span> New Playlist
         </button>
       </nav>
 
-      {/* Logout Button — bottom of sidebar */}
-      <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a45", flexShrink: 0 }}>
+      {/* Theme Toggle */}
+      <div style={{ padding: "12px 16px 0" }}>
+        <ThemeToggle />
+      </div>
+
+      {/* Logout */}
+      <div style={{ padding: "12px 16px", borderTop: `1px solid ${border}`, flexShrink: 0 }}>
         <button onClick={onLogout}
-          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 10, background: "none", border: "1px solid #2a2a45", cursor: "pointer", color: "#606080", fontSize: 13, fontFamily: "inherit", transition: "all .2s" }}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 10, background: "none", border: `1px solid ${border}`, cursor: "pointer", color: subText, fontSize: 13, fontFamily: "inherit", transition: "all .2s" }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = "#ff6b6b"; e.currentTarget.style.color = "#ff6b6b"; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a45"; e.currentTarget.style.color = "#606080"; }}>
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border; e.currentTarget.style.color = subText; }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
