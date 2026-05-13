@@ -12,7 +12,7 @@ export default function MainContent({
       flexDirection: "column",
       background: "#0a0a0f",
       /* On desktop this div itself scrolls; on mobile the parent scrolls */
-      overflowY: isMobile ? "visible" : "auto",
+overflowY: isMobile ? "auto" : "auto",
       overflowX: "hidden",
       WebkitOverflowScrolling: "touch",
     }}>
@@ -458,8 +458,8 @@ function LoadingSkeleton() {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.7} }
         @keyframes bar { from{transform:scaleY(1)} to{transform:scaleY(0.3)} }
-        .like-btn { opacity: 0 !important; }
-        *:hover > .like-btn { opacity: 1 !important; }
+        @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.7} }
+        @keyframes bar { from{transform:scaleY(1)} to{transform:scaleY(0.3)} }
       `}</style>
     </div>
   );
