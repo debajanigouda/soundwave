@@ -55,13 +55,17 @@ export default function App() {
       }
     }, 1000);
   }
+
   function stopProgressTracking() {
-    if (progressInterval.current) { clearInterval(progressInterval.current); progressInterval.current = null; }
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
   }
 
   function autoNext() {
     const list = songsRef.current;
-    const cur  = currentSongRef.current;
+    const cur = currentSongRef.current;
     if (!list.length) return;
     if (isRepeatRef.current) { playerRef.current?.seekTo(0); playerRef.current?.playVideo(); return; }
     if (isShuffleRef.current) { playSongFn.current?.(list[Math.floor(Math.random() * list.length)]); return; }
@@ -81,10 +85,10 @@ export default function App() {
           onReady: e => { e.target.setVolume(80); },
           onStateChange: e => {
             const S = window.YT.PlayerState;
-            if (e.data === S.PLAYING)   { setIsPlaying(true);  setIsBuffering(false); startProgressTracking(); }
-            else if (e.data === S.PAUSED)    { setIsPlaying(false); stopProgressTracking(); }
+            if (e.data === S.PLAYING) { setIsPlaying(true); setIsBuffering(false); startProgressTracking(); }
+            else if (e.data === S.PAUSED) { setIsPlaying(false); stopProgressTracking(); }
             else if (e.data === S.BUFFERING) { setIsBuffering(true); }
-            else if (e.data === S.ENDED)     { stopProgressTracking(); autoNext(); }
+            else if (e.data === S.ENDED) { stopProgressTracking(); autoNext(); }
           },
           onError: () => { setIsBuffering(false); autoNext(); },
         },
@@ -105,9 +109,9 @@ export default function App() {
       title: currentSong.title, artist: currentSong.artist,
       artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
     });
-    navigator.mediaSession.setActionHandler("play",          () => togglePlay());
-    navigator.mediaSession.setActionHandler("pause",         () => togglePlay());
-    navigator.mediaSession.setActionHandler("nexttrack",     () => nextSong());
+    navigator.mediaSession.setActionHandler("play", () => togglePlay());
+    navigator.mediaSession.setActionHandler("pause", () => togglePlay());
+    navigator.mediaSession.setActionHandler("nexttrack", () => nextSong());
     navigator.mediaSession.setActionHandler("previoustrack", () => prevSong());
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }, [currentSong]);
@@ -118,29 +122,29 @@ export default function App() {
     loadTrending();
     try {
       const s = localStorage.getItem("sw_current_song"); if (s) setCurrentSong(JSON.parse(s));
-      const v = localStorage.getItem("sw_volume");       if (v) setVolume(parseFloat(v));
+      const v = localStorage.getItem("sw_volume"); if (v) setVolume(parseFloat(v));
     } catch (e) {}
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
   useEffect(() => {
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    setUser(session?.user ?? null);
-    setAuthLoading(false);
-    if (session?.user) loadUserData(session.user.id);
-  });
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-    setUser(session?.user ?? null);
-    if (session?.user) loadUserData(session.user.id);
-    else setLikedSongs(new Set());
-  });
-  return () => subscription.unsubscribe();
-}, []);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+      if (session?.user) loadUserData(session.user.id);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) loadUserData(session.user.id);
+      else setLikedSongs(new Set());
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-async function loadUserData(userId) {
-  const liked = await getLikedSongs(userId);
-  setLikedSongs(new Set(liked.map(s => s.song_id)));
-}
+  async function loadUserData(userId) {
+    const liked = await getLikedSongs(userId);
+    setLikedSongs(new Set(liked.map(s => s.song_id)));
+  }
 
   async function loadTrending() {
     setIsLoading(true);
@@ -157,15 +161,15 @@ async function loadUserData(userId) {
     setIsLoading(false);
   }
 
-function playSong(song) {
-  if (!song) return;
-  setCurrentSong(song);
-  setProgress(0);
-  setIsBuffering(true);
-  playerRef.current?.loadVideoById(song.youtubeId);
-  if (user) addToHistory(user.id, song);
-}
-playSongFn.current = playSong;
+  function playSong(song) {
+    if (!song) return;
+    setCurrentSong(song);
+    setProgress(0);
+    setIsBuffering(true);
+    playerRef.current?.loadVideoById(song.youtubeId);
+    if (user) addToHistory(user.id, song);
+  }
+  playSongFn.current = playSong;
 
   function togglePlay() {
     if (!currentSong) { if (songsRef.current.length > 0) playSong(songsRef.current[0]); return; }
@@ -195,19 +199,19 @@ playSongFn.current = playSong;
   }
 
   async function toggleLike(id) {
-  const song = songs.find(s => s.id === id);
-  setLikedSongs(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) {
-      next.delete(id);
-      if (user) unlikeSong(user.id, id);
-    } else {
-      next.add(id);
-      if (user && song) likeSong(user.id, song);
-    }
-    return next;
-  });
-}
+    const song = songs.find(s => s.id === id);
+    setLikedSongs(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        if (user) unlikeSong(user.id, id);
+      } else {
+        next.add(id);
+        if (user && song) likeSong(user.id, song);
+      }
+      return next;
+    });
+  }
 
   const sharedProps = {
     songs, currentSong, isPlaying, isBuffering, isLoading,
@@ -218,10 +222,10 @@ playSongFn.current = playSong;
     playlists: PLAYLISTS, genres: GENRES, loadTrending,
     handleGenreSearch: handleSearch, isMobile,
     onLogout: () => supabase.auth.signOut(),
-user,
+    user,
   };
 
-if (authLoading) {
+  if (authLoading) {
     return (
       <div style={{ height: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center" }}>
@@ -233,9 +237,10 @@ if (authLoading) {
   }
 
   if (!user) {
-    return <Auth onLogin={setUser}/>;
+    return <Auth onLogin={setUser} />;
   }
-  return ( 
+
+  return (
     <>
       <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, pointerEvents: "none" }}>
         <div id="yt-player" />
@@ -263,68 +268,29 @@ function DesktopLayout(props) {
   );
 }
 
-function MobileLayout(props) {
-  const { currentPage, setCurrentPage, likedSongs } = props;
-  const [showFullPlayer, setShowFullPlayer] = useState(false);
-  const [showDrawer,     setShowDrawer]     = useState(false);
-  const tabs = [
-    { id: "home",    label: "Home",    Icon: HomeIcon },
-    { id: "search",  label: "Search",  Icon: SearchIcon },
-    { id: "library", label: "Library", Icon: LibraryIcon },
-    { id: "liked",   label: "Liked",   Icon: HeartIcon },
-  ];
-  const pageTitle = { home: "Good vibes 🎵", search: "Discover", library: "Library", liked: "Liked Songs" }[currentPage] || "SoundWave";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
-        </div>
-        <button onClick={() => setShowDrawer(true)}
-          style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
-        </button>
-      </div>
-      
-
-      {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
-
-      <nav style={{ display: "flex", background: "#111118", borderTop: "1px solid #1e1e2e", paddingBottom: "env(safe-area-inset-bottom,0px)", flexShrink: 0 }}>
-        {tabs.map(({ id, label, Icon }) => {
-          const active = currentPage === id;
-          return (
-            <button key={id} onClick={() => setCurrentPage(id)}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: active ? "#1db954" : "#6b7280" }}>
-              <Icon size={22} active={active} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "inherit" }}>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
-{showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}    </div>
-  );
-}
+// ✅ ONLY ONE MobileLayout — duplicate removed
 function MobileLayout(props) {
   const { currentPage, setCurrentPage, likedSongs } = props;
   const [showFullPlayer, setShowFullPlayer] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
+
   const tabs = [
     { id: "home",    label: "Home",    Icon: HomeIcon },
     { id: "search",  label: "Search",  Icon: SearchIcon },
     { id: "library", label: "Library", Icon: LibraryIcon },
     { id: "liked",   label: "Liked",   Icon: HeartIcon },
   ];
-  const pageTitle = { home: "Good vibes 🎵", search: "Discover", library: "Library", liked: "Liked Songs" }[currentPage] || "SoundWave";
+
+  const pageTitle = {
+    home: "Good vibes 🎵",
+    search: "Discover",
+    library: "Library",
+    liked: "Liked Songs",
+  }[currentPage] || "SoundWave";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
-      
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
         <div>
@@ -334,17 +300,19 @@ function MobileLayout(props) {
         <button onClick={() => setShowDrawer(true)}
           style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
         </button>
       </div>
 
-      {/* ✅ THIS WAS MISSING — main content area */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      {/* ✅ Main scrollable content */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
         <MainContent {...props} />
       </div>
 
-      {/* Mini player sits above bottom nav */}
+      {/* Mini player */}
       {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
       {/* Bottom nav */}
@@ -366,6 +334,7 @@ function MobileLayout(props) {
     </div>
   );
 }
+
 function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, onExpand }) {
   const pct = duration ? (progress / duration) * 100 : 0;
   return (
@@ -380,12 +349,13 @@ function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong,
           <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.title}</div>
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.artist}</div>
         </div>
-        <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><PrevIcon size={20}/></button>
+        <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><PrevIcon size={20} /></button>
         <button onClick={togglePlay} style={{ width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {isBuffering ? <div style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            : isPlaying ? <PauseIcon size={16} color="#000"/> : <PlayIcon size={16} color="#000"/>}
+          {isBuffering
+            ? <div style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+            : isPlaying ? <PauseIcon size={16} color="#000" /> : <PlayIcon size={16} color="#000" />}
         </button>
-        <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><NextIcon size={20}/></button>
+        <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", display: "flex", padding: 6 }}><NextIcon size={20} /></button>
       </div>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
@@ -395,19 +365,19 @@ function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong,
 function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, seekTo, isShuffle, setIsShuffle, isRepeat, setIsRepeat, likedSongs, toggleLike, volume, setVolume, isMuted, setIsMuted, onClose }) {
   const pct = duration ? (progress / duration) * 100 : 0;
   const liked = currentSong && likedSongs.has(currentSong.id);
-  const fmt = s => !s || isNaN(s) ? "0:00" : `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+  const fmt = s => !s || isNaN(s) ? "0:00" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "linear-gradient(180deg,#1a0a2e 0%,#0a0a1a 100%)", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 4 }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
         </button>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#a0a0b8", letterSpacing: 0.5 }}>NOW PLAYING</span>
         <button onClick={() => currentSong && toggleLike(currentSong.id)}
           style={{ background: "none", border: "none", cursor: "pointer", color: liked ? "#1db954" : "#6b7280", display: "flex", padding: 4 }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
         </button>
       </div>
@@ -436,23 +406,24 @@ function FullScreenPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nex
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-          <button onClick={() => setIsShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "#6b7280", padding: 8 }}><ShuffleIcon size={22}/></button>
-          <button onClick={prevSong}  style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={32}/></button>
+          <button onClick={() => setIsShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "#6b7280", padding: 8 }}><ShuffleIcon size={22} /></button>
+          <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={32} /></button>
           <button onClick={togglePlay} style={{ width: 64, height: 64, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {isBuffering ? <div style={{ width: 24, height: 24, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
-              : isPlaying ? <PauseIcon size={28} color="#000"/> : <PlayIcon size={28} color="#000"/>}
+            {isBuffering
+              ? <div style={{ width: 24, height: 24, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
+              : isPlaying ? <PauseIcon size={28} color="#000" /> : <PlayIcon size={28} color="#000" />}
           </button>
-          <button onClick={nextSong}  style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={32}/></button>
-          <button onClick={() => setIsRepeat(r => !r)} style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "#6b7280", padding: 8 }}><RepeatIcon size={22}/></button>
+          <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={32} /></button>
+          <button onClick={() => setIsRepeat(r => !r)} style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "#6b7280", padding: 8 }}><RepeatIcon size={22} /></button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
-          <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.min(1,Math.max(0,(e.clientX-r.left)/r.width))); setIsMuted(false); }}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3z" /></svg>
+          <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setVolume(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width))); setIsMuted(false); }}
             style={{ flex: 1, height: 4, background: "#2a2a3e", borderRadius: 4, cursor: "pointer" }}>
             <div style={{ width: `${isMuted ? 0 : volume * 100}%`, height: "100%", background: "#6b7280", borderRadius: 4 }} />
           </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#6b7280"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" /></svg>
         </div>
       </div>
       <style>{`@keyframes spin2{to{transform:rotate(360deg)}}`}</style>
@@ -469,7 +440,6 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
           <div style={{ fontSize: 20, fontWeight: 700, color: "#1db954" }}>SoundWave</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 22 }}>✕</button>
         </div>
-
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
           {[
             { id: "home",      label: "Home",                       emoji: "🏠" },
@@ -483,7 +453,6 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
               <span style={{ fontSize: 18 }}>{item.emoji}</span>{item.label}
             </button>
           ))}
-
           <div style={{ padding: "16px 14px 8px", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: "#6b7280", textTransform: "uppercase" }}>Playlists</div>
           {playlists.map(p => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 10 }}>
@@ -495,13 +464,11 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
             </div>
           ))}
         </div>
-
-        {/* Logout at bottom */}
         <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a3e", flexShrink: 0 }}>
           <button onClick={() => { onLogout(); onClose(); }}
             style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 10, background: "none", border: "1px solid #2a2a3e", cursor: "pointer", color: "#6b7280", fontSize: 14, fontFamily: "inherit" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor="#ff6b6b"; e.currentTarget.style.color="#ff6b6b"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor="#2a2a3e"; e.currentTarget.style.color="#6b7280"; }}>
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#ff6b6b"; e.currentTarget.style.color = "#ff6b6b"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a3e"; e.currentTarget.style.color = "#6b7280"; }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
@@ -510,19 +477,18 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
             Logout
           </button>
         </div>
-
       </div>
     </div>
   );
 }
 
-function HomeIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>; }
-function SearchIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active?"2.5":"2"} strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>; }
-function LibraryIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active?"2.5":"2"} strokeLinecap="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>; }
-function HeartIcon({ size=24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>; }
-function PlayIcon({ size=24, color="currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z"/></svg>; }
-function PauseIcon({ size=24, color="currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>; }
-function NextIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>; }
-function PrevIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>; }
-function ShuffleIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>; }
-function RepeatIcon({ size=24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>; }
+function HomeIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>; }
+function SearchIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>; }
+function LibraryIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round"><path d="M3 3h18v18H3z" /><path d="M3 9h18M9 21V9" /></svg>; }
+function HeartIcon({ size = 24, active }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>; }
+function PlayIcon({ size = 24, color = "currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M8 5v14l11-7z" /></svg>; }
+function PauseIcon({ size = 24, color = "currentColor" }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill={color}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>; }
+function NextIcon({ size = 24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>; }
+function PrevIcon({ size = 24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>; }
+function ShuffleIcon({ size = 24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /></svg>; }
+function RepeatIcon({ size = 24 }) { return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>; }
