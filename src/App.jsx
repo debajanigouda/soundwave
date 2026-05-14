@@ -5,7 +5,7 @@ import Player from "./components/Player";
 import { PLAYLISTS, GENRES } from "./data/songs";
 import { searchSongs, getTrending, prefetchSongs } from "./api";
 import { supabase } from "./supabase";
-import { getLikedSongs, likeSong, unlikeSong, addToHistory } from "./db";
+import { getLikedSongs, likeSong, unlikeSong, addToHistory, getPlaylists, addSongToPlaylist, removeSongFromPlaylist, createPlaylist } from "./db";
 import Auth from "./components/Auth";
 import { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
@@ -28,6 +28,10 @@ export default function App() {
   const [isBuffering, setIsBuffering] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [user, setUser] = useState(null);
+  const [dbPlaylists, setDbPlaylists] = useState([]);
+const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
+const [selectedSong, setSelectedSong] = useState(null);
+const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // Sleep timer
@@ -173,9 +177,11 @@ export default function App() {
   }, []);
 
   async function loadUserData(userId) {
-    const liked = await getLikedSongs(userId);
-    setLikedSongs(new Set(liked.map(s => s.song_id)));
-  }
+  const liked = await getLikedSongs(userId);
+  setLikedSongs(new Set(liked.map(s => s.song_id)));
+  const playlists = await getPlaylists(userId);
+  setDbPlaylists(playlists);
+}
 
   async function loadTrending() {
     setIsLoading(true);
@@ -254,6 +260,36 @@ export default function App() {
     }
   }
 
+  function showToast(msg) {
+  setToast(msg);
+  setTimeout(() => setToast(null), 2500);
+}
+
+function handleAddToPlaylist(song) {
+  setSelectedSong(song);
+  setShowAddToPlaylist(true);
+}
+
+async function handleAddSongToPlaylist(playlistId) {
+  if (!selectedSong || !user) return;
+  const result = await addSongToPlaylist(playlistId, selectedSong);
+  setShowAddToPlaylist(false);
+  if (result?.alreadyExists) {
+    showToast("Already in playlist!");
+  } else {
+    showToast("Added to playlist ✅");
+    const playlists = await getPlaylists(user.id);
+    setDbPlaylists(playlists);
+  }
+}
+
+async function handleCreatePlaylist(name, emoji) {
+  if (!user) return;
+  await createPlaylist(user.id, name, emoji);
+  const playlists = await getPlaylists(user.id);
+  setDbPlaylists(playlists);
+}
+
   const sharedProps = {
     songs, currentSong, isPlaying, isBuffering, isLoading,
     likedSongs, playSong, toggleLike, togglePlay, nextSong, prevSong,
@@ -265,6 +301,14 @@ export default function App() {
     onLogout: () => supabase.auth.signOut(),
     user, shareSong,
     sleepMinutes, setSleepMinutes, sleepRemaining,
+      dbPlaylists,
+  handleAddToPlaylist,
+  handleAddSongToPlaylist,
+  handleCreatePlaylist,
+  showAddToPlaylist,
+  setShowAddToPlaylist,
+  selectedSong,
+  toast,
   };
 
   if (authLoading) {
@@ -280,12 +324,34 @@ export default function App() {
 
   if (!user) return <Auth onLogin={setUser} />;
 
-  return (
+  return ( 
     <>
       <div style={{ position: "fixed", top: -9999, left: -9999, width: 1, height: 1, pointerEvents: "none" }}>
         <div id="yt-player" />
       </div>
       {isMobile ? <MobileLayout {...sharedProps} /> : <DesktopLayout {...sharedProps} />}
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
+          background: "#1db954", color: "#000", padding: "12px 24px",
+          borderRadius: 100, fontSize: 14, fontWeight: 700,
+          zIndex: 99999, boxShadow: "0 4px 20px rgba(29,185,84,0.4)",
+          whiteSpace: "nowrap",
+        }}>{toast}</div>
+      )}
+
+      {/* Add to playlist modal */}
+      {showAddToPlaylist && (
+        <AddToPlaylistModal
+          playlists={dbPlaylists}
+          song={selectedSong}
+          onAdd={handleAddSongToPlaylist}
+          onClose={() => setShowAddToPlaylist(false)}
+          onCreate={handleCreatePlaylist}
+        />
+      )}
     </>
   );
 }
@@ -630,6 +696,105 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
             Logout
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AddToPlaylistModal({ playlists, song, onAdd, onClose, onCreate }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const emojis = ["🎵", "🎸", "🎤", "🎧", "🎹", "🔥", "💫", "🌙"];
+  const [selectedEmoji, setSelectedEmoji] = useState("🎵");
+
+  async function handleCreate() {
+    if (!newName.trim()) return;
+    await onCreate(newName.trim(), selectedEmoji);
+    setShowCreate(false);
+    setNewName("");
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 99998, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)" }} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 500,
+        background: "#1a1a2e", borderRadius: "20px 20px 0 0",
+        padding: "20px 20px 40px", zIndex: 1,
+        maxHeight: "70vh", overflowY: "auto",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>Add to playlist</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#6b7280", fontSize: 22, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {/* Song info */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "rgba(255,255,255,0.05)", borderRadius: 12, marginBottom: 16 }}>
+          <img src={song?.thumbnail} alt={song?.title} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover" }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song?.title}</div>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>{song?.artist}</div>
+          </div>
+        </div>
+
+        {/* Create new playlist */}
+        {showCreate ? (
+          <div style={{ marginBottom: 16, background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 14 }}>
+            <div style={{ fontSize: 13, color: "#a0a0b8", marginBottom: 10 }}>Choose emoji</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              {emojis.map(e => (
+                <button key={e} onClick={() => setSelectedEmoji(e)}
+                  style={{ fontSize: 22, background: selectedEmoji === e ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.06)", border: selectedEmoji === e ? "1px solid #1db954" : "1px solid transparent", borderRadius: 8, width: 40, height: 40, cursor: "pointer" }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+            <input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Playlist name..."
+              autoFocus
+              style={{ width: "100%", background: "rgba(255,255,255,0.08)", border: "1px solid #2a2a3e", borderRadius: 10, padding: "10px 14px", color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 10 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowCreate(false)}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, background: "rgba(255,255,255,0.06)", border: "none", color: "#a0a0b8", cursor: "pointer", fontFamily: "inherit", fontSize: 14 }}>
+                Cancel
+              </button>
+              <button onClick={handleCreate}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, background: "#1db954", border: "none", color: "#000", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 14 }}>
+                Create
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowCreate(true)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 14px", borderRadius: 12, background: "rgba(29,185,84,0.1)", border: "1px dashed #1db954", cursor: "pointer", color: "#1db954", fontSize: 14, fontWeight: 600, fontFamily: "inherit", marginBottom: 12 }}>
+            <span style={{ fontSize: 20 }}>+</span> Create new playlist
+          </button>
+        )}
+
+        {/* Existing playlists */}
+        {playlists.length === 0 && !showCreate && (
+          <div style={{ textAlign: "center", padding: "20px", color: "#6b7280", fontSize: 14 }}>
+            No playlists yet — create one above!
+          </div>
+        )}
+        {playlists.map(p => (
+          <button key={p.id} onClick={() => onAdd(p.id)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", fontFamily: "inherit", marginBottom: 8, transition: "all 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(29,185,84,0.1)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}>
+            <div style={{ width: 42, height: 42, borderRadius: 10, background: p.color || "#1db954", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+              {p.cover_emoji || "🎵"}
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>{p.name}</div>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>{p.playlist_songs?.length || 0} songs</div>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
