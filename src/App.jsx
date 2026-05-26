@@ -34,8 +34,9 @@ const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 const [selectedSong, setSelectedSong] = useState(null);
 const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-const const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);{ cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
-  // Sleep timer
+const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
+
+// Sleep timer
   const [sleepMinutes, setSleepMinutes] = useState(null);
   const [sleepRemaining, setSleepRemaining] = useState(null);
   const sleepRef = useRef(null);
