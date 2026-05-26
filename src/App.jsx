@@ -34,8 +34,7 @@ const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 const [selectedSong, setSelectedSong] = useState(null);
 const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const { cachedSongs, isCached, deleteCachedSong, cacheSong } = useOfflineCache(currentSong, isPlaying);
-
+const const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);{ cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
   // Sleep timer
   const [sleepMinutes, setSleepMinutes] = useState(null);
   const [sleepRemaining, setSleepRemaining] = useState(null);
@@ -313,7 +312,6 @@ async function handleCreatePlaylist(name, emoji) {
     cachedSongs,
 isCached,
 deleteCachedSong,
-cacheSong,
 };
 
   if (authLoading) {
