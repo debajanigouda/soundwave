@@ -213,13 +213,13 @@ async function handleAudioStream(request) {
   // Not cached — fetch from network
   try {
     const response = await fetch(request);
-    if (!response.ok) return response;
+if (!response.ok) return response;
 
-    // Clone and cache the audio blob in background
-    const clone = response.clone();
-    cacheAudioInBackground(url, clone);
+// Clone BEFORE reading — must clone first, return clone, cache original
+const toReturn = response.clone();
+cacheAudioInBackground(url, response);
 
-    return response;
+return toReturn;
   } catch (err) {
     // Network failed and no cache — return offline error
     return new Response(
