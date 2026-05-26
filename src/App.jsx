@@ -299,17 +299,16 @@ async function handleCreatePlaylist(name, emoji) {
     playlists: PLAYLISTS, genres: GENRES, loadTrending,
     handleGenreSearch: handleSearch, isMobile,
     onLogout: () => supabase.auth.signOut(),
-    user, shareSong,
-    sleepMinutes, setSleepMinutes, sleepRemaining,
-      dbPlaylists,
-  handleAddToPlaylist,
-  handleAddSongToPlaylist,
-  handleCreatePlaylist,
-  showAddToPlaylist,
-  setShowAddToPlaylist,
-  selectedSong,
-  toast,
-  };
+    user,
+    dbPlaylists,
+    handleAddToPlaylist,
+    handleAddSongToPlaylist,
+    handleCreatePlaylist,
+    showAddToPlaylist,
+    setShowAddToPlaylist,
+    selectedSong,
+    toast,
+};
 
   if (authLoading) {
     return (
