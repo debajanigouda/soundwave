@@ -407,18 +407,34 @@ function MobileLayout(props) {
 
       {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
-      <nav style={{ display: "flex", background: "#111118", borderTop: "1px solid #1e1e2e", paddingBottom: "env(safe-area-inset-bottom, 8px)", flexShrink: 0 }}>
-        {tabs.map(({ id, label, Icon }) => {
-          const active = currentPage === id;
-          return (
-            <button key={id} onClick={() => setCurrentPage(id)}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "10px 0", background: "none", border: "none", cursor: "pointer", color: active ? "#1db954" : "#6b7280" }}>
-              <Icon size={22} active={active} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, fontFamily: "inherit" }}>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <nav style={{ display: "flex", background: "#0d0d18", borderTop: "1px solid rgba(255,255,255,0.06)", paddingBottom: "env(safe-area-inset-bottom, 8px)", flexShrink: 0 }}>
+  {tabs.map(({ id, label, Icon }) => {
+    const active = currentPage === id;
+    return (
+      <button key={id} onClick={() => setCurrentPage(id)}
+        style={{
+          flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+          justifyContent: "center", gap: 4, padding: "10px 0",
+          background: "none", border: "none", cursor: "pointer",
+          color: active ? "#1db954" : "#6b7280",
+          position: "relative",
+          transition: "color 0.2s ease",
+        }}>
+        {active && (
+          <div style={{
+            position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+            width: 32, height: 2, background: "#1db954", borderRadius: "0 0 4px 4px",
+            boxShadow: "0 0 8px rgba(29,185,84,0.6)",
+          }} />
+        )}
+        <div style={{ transform: active ? "scale(1.1)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
+          <Icon size={22} active={active} />
+        </div>
+        <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, fontFamily: "inherit", letterSpacing: active ? 0.3 : 0 }}>{label}</span>
+      </button>
+    );
+  })}
+</nav>
 
       {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
       {showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}

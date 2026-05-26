@@ -40,13 +40,25 @@ export default function MainContent({
       </div>
 
       <style>{`
-        @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.7} }
-        @keyframes bar { from{transform:scaleY(1)} to{transform:scaleY(0.3)} }
-        @keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
-        .song-row:active { background: rgba(29,185,84,0.06) !important; }
-        .genre-btn:active { transform: scale(0.97); }
-        .quick-card:active { transform: scale(0.98); }
-      `}</style>
+  @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:0.7} }
+  @keyframes bar { from{transform:scaleY(1)} to{transform:scaleY(0.3)} }
+  @keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
+  @keyframes songIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes heartPop { 0%{transform:scale(1)} 40%{transform:scale(1.4)} 70%{transform:scale(0.9)} 100%{transform:scale(1)} }
+  .song-row { transition: all 0.18s cubic-bezier(0.4,0,0.2,1) !important; }
+  .song-row:hover { background: rgba(255,255,255,0.05) !important; transform: translateX(3px); }
+  .song-row:active { transform: scale(0.99) !important; }
+  .genre-btn { transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1) !important; }
+  .genre-btn:hover { transform: scale(1.05) !important; }
+  .genre-btn:active { transform: scale(0.96) !important; }
+  .quick-card { transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1) !important; }
+  .quick-card:hover { transform: scale(1.03) !important; box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important; }
+  .quick-card:active { transform: scale(0.97) !important; }
+  .heart-liked { animation: heartPop 0.35s ease !important; }
+  .add-btn { transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1) !important; }
+  .add-btn:hover { transform: scale(1.2) rotate(90deg) !important; color: #1db954 !important; }
+  .add-btn:active { transform: scale(0.9) !important; }
+`}</style>
     </div>
   );
 }
@@ -293,23 +305,40 @@ function SongList({ songs, isLoading, likedSongs, currentSong, isPlaying, playSo
 function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, isMobile, darkMode, handleAddToPlaylist }) {
   return (
     <div className="song-row" onClick={() => playSong(song)}
-      style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 14, padding: isMobile ? "10px 6px" : "6px 8px", borderRadius: 12, background: active ? "rgba(29,185,84,0.1)" : "transparent", cursor: "pointer", transition: "background 0.15s" }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"; }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+      style={{
+        display: "flex", alignItems: "center",
+        gap: isMobile ? 12 : 14,
+        padding: isMobile ? "10px 8px" : "8px 10px",
+        borderRadius: 12,
+        background: active ? "rgba(29,185,84,0.08)" : "transparent",
+        cursor: "pointer",
+        borderLeft: active ? "3px solid #1db954" : "3px solid transparent",
+      }}>
 
       {!isMobile && (
-        <div style={{ width: 20, textAlign: "center", flexShrink: 0, color: active ? "#1db954" : "#6b7280", fontSize: 13 }}>
-          {active && isPlaying ? "▶" : index + 1}
+        <div style={{ width: 20, textAlign: "center", flexShrink: 0, color: active ? "#1db954" : "#6b7280", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+          {active && isPlaying ? (
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 14, justifyContent: "center" }}>
+              {[6, 10, 7].map((h, i) => (
+                <div key={i} style={{ width: 2, height: h, background: "#1db954", borderRadius: 2, animation: `bar 0.7s ease-in-out ${i * 0.1}s infinite alternate`, transformOrigin: "bottom" }} />
+              ))}
+            </div>
+          ) : index + 1}
         </div>
       )}
 
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <img src={song.thumbnail} alt={song.title} style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", display: "block" }} onError={e => { e.target.style.background = "#1db954"; }} />
+        <img src={song.thumbnail} alt={song.title}
+          style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", display: "block",
+            boxShadow: active ? "0 0 0 2px #1db954" : "none",
+            transition: "box-shadow 0.2s ease",
+          }}
+          onError={e => { e.target.style.background = "#1db954"; }} />
         {active && isPlaying && (
-          <div style={{ position: "absolute", inset: 0, borderRadius: 10, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, borderRadius: 10, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 16 }}>
-              {[10, 16, 8, 14, 12].map((h, i) => (
-                <div key={i} style={{ width: 3, height: h, background: "#1db954", borderRadius: 2, animation: `bar 0.8s ease-in-out ${i * 0.15}s infinite alternate`, transformOrigin: "bottom" }} />
+              {[8, 14, 10, 14, 8].map((h, i) => (
+                <div key={i} style={{ width: 3, height: h, background: "#1db954", borderRadius: 2, animation: `bar 0.7s ease-in-out ${i * 0.1}s infinite alternate`, transformOrigin: "bottom" }} />
               ))}
             </div>
           </div>
@@ -317,15 +346,13 @@ function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, 
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: active ? "#1db954" : (darkMode ? "#fff" : "#111"), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.title}</div>
-        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.artist}</div>
+        <div style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: active ? "#1db954" : (darkMode ? "#f0f0ff" : "#111"), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "color 0.2s" }}>{song.title}</div>
+        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.artist}</div>
       </div>
 
       {handleAddToPlaylist && (
-        <button onClick={e => { e.stopPropagation(); handleAddToPlaylist(song); }}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center", transition: "color 0.2s" }}
-          onMouseEnter={e => e.currentTarget.style.color = "#1db954"}
-          onMouseLeave={e => e.currentTarget.style.color = "#3a3a5a"}>
+        <button className="add-btn" onClick={e => { e.stopPropagation(); handleAddToPlaylist(song); }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center" }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="16"/>
@@ -335,8 +362,9 @@ function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, 
       )}
 
       <button onClick={e => { e.stopPropagation(); toggleLike(song.id); }}
-        style={{ background: "none", border: "none", cursor: "pointer", padding: 10, color: liked ? "#1db954" : "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center", transition: "color 0.2s, transform 0.1s" }}
-        onTouchStart={e => e.currentTarget.style.transform = "scale(1.2)"}
+        className={liked ? "heart-liked" : ""}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 10, color: liked ? "#1db954" : "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center", transition: "color 0.2s" }}
+        onTouchStart={e => e.currentTarget.style.transform = "scale(1.3)"}
         onTouchEnd={e => e.currentTarget.style.transform = "scale(1)"}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
