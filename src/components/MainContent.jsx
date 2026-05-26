@@ -4,10 +4,10 @@ import { ThemeContext } from "../ThemeContext";
 export default function MainContent({
   currentPage, searchQuery, handleSearch, songs, likedSongs, currentSong,
   isPlaying, isLoading, playSong, toggleLike, isShuffle, setIsShuffle,
-  isRepeat, setIsRepeat, playlists, genres, loadTrending, handleGenreSearch, isMobile,
+  isRepeat, setIsRepeat, playlists, dbPlaylists, genres, loadTrending,
+  handleGenreSearch, isMobile, handleAddToPlaylist,
 }) {
   const { darkMode } = useContext(ThemeContext);
-
   const bg = darkMode ? "#0a0a0f" : "#f5f5f5";
 
   return (
@@ -32,10 +32,10 @@ export default function MainContent({
       )}
 
       <div style={{ padding: isMobile ? "16px 16px 32px" : "24px 32px 100px" }}>
-        {currentPage === "home"      && <HomePage songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} genres={genres} handleGenreSearch={handleGenreSearch} loadTrending={loadTrending} isMobile={isMobile} handleSearch={handleSearch} darkMode={darkMode} />}
-        {currentPage === "search"    && <SearchPage songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} searchQuery={searchQuery} isMobile={isMobile} genres={genres} handleGenreSearch={handleGenreSearch} darkMode={darkMode} />}
-        {currentPage === "library"   && <LibraryPage playlists={playlists} songs={songs} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} />}
-        {currentPage === "liked"     && <LikedPage songs={songs} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} />}
+        {currentPage === "home"      && <HomePage songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} genres={genres} handleGenreSearch={handleGenreSearch} loadTrending={loadTrending} isMobile={isMobile} handleSearch={handleSearch} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />}
+        {currentPage === "search"    && <SearchPage songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} searchQuery={searchQuery} isMobile={isMobile} genres={genres} handleGenreSearch={handleGenreSearch} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />}
+        {currentPage === "library"   && <LibraryPage playlists={dbPlaylists || playlists} songs={songs} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />}
+        {currentPage === "liked"     && <LikedPage songs={songs} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />}
         {currentPage === "downloads" && <Empty emoji="⬇️" text="Downloads coming soon" sub="Phase 5 of the roadmap" darkMode={darkMode} />}
       </div>
 
@@ -100,10 +100,9 @@ function SearchBar({ searchQuery, handleSearch, darkMode }) {
   );
 }
 
-function HomePage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSong, toggleLike, genres, handleGenreSearch, loadTrending, isMobile, handleSearch, darkMode }) {
+function HomePage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSong, toggleLike, genres, handleGenreSearch, loadTrending, isMobile, handleSearch, darkMode, handleAddToPlaylist }) {
   const quickPicks = songs.slice(0, 6);
   const featured   = songs.slice(0, 4);
-  const titleColor = darkMode ? "#fff" : "#111";
   const genreBg    = darkMode ? "#1a1a28" : "#fff";
   const genreBdr   = darkMode ? "#2a2a3e" : "#ddd";
   const genreClr   = darkMode ? "#a0a0b8" : "#555";
@@ -148,7 +147,7 @@ function HomePage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSo
         <SectionTitle title="Trending now" noMargin darkMode={darkMode} />
         <button onClick={loadTrending} style={{ background: "none", border: "none", color: "#1db954", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Refresh ↺</button>
       </div>
-      <SongList songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist}/>
+      <SongList songs={songs} isLoading={isLoading} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />
     </>
   );
 }
@@ -192,7 +191,7 @@ function QuickPickCard({ song, active, isPlaying, playSong, darkMode }) {
   );
 }
 
-function SearchPage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSong, toggleLike, searchQuery, isMobile, genres, handleGenreSearch, darkMode }) {
+function SearchPage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSong, toggleLike, searchQuery, isMobile, genres, handleGenreSearch, darkMode, handleAddToPlaylist }) {
   const colors = ["#6c63ff","#e91429","#2d46b9","#af2896","#e8115b","#148a08","#1e3264","#8400e7","#ba5d07","#006450","#e13300","#477d95"];
   if (!searchQuery) {
     return (
@@ -218,22 +217,27 @@ function SearchPage({ songs, isLoading, likedSongs, currentSong, isPlaying, play
   );
 }
 
-function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, playSong, toggleLike, isMobile, darkMode }) {
+function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, playSong, toggleLike, isMobile, darkMode, handleAddToPlaylist }) {
   const cardBg  = darkMode ? "#161622" : "#fff";
   const cardBdr = darkMode ? "#252535" : "#e0e0ee";
   const cardHov = darkMode ? "#1e1e30" : "#f0f0ff";
   return (
     <>
       <SectionTitle title="Your playlists" darkMode={darkMode} />
+      {playlists.length === 0 && (
+        <Empty emoji="🎵" text="No playlists yet" sub="Create one by tapping + on any song" darkMode={darkMode} />
+      )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: 14, marginBottom: 36 }}>
         {playlists.map(p => (
           <div key={p.id}
             style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s" }}
             onMouseEnter={e => e.currentTarget.style.background = cardHov}
             onMouseLeave={e => e.currentTarget.style.background = cardBg}>
-            <div style={{ width: "100%", aspectRatio: "1", borderRadius: 12, background: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 10 }}>{p.emoji}</div>
+            <div style={{ width: "100%", aspectRatio: "1", borderRadius: 12, background: p.color || "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 10 }}>
+              {p.cover_emoji || p.emoji || "🎵"}
+            </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#fff" : "#111", marginBottom: 2 }}>{p.name}</div>
-            <div style={{ fontSize: 11, color: "#6b7280" }}>0 songs</div>
+            <div style={{ fontSize: 11, color: "#6b7280" }}>{p.playlist_songs?.length || 0} songs</div>
           </div>
         ))}
       </div>
@@ -243,7 +247,7 @@ function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, pla
   );
 }
 
-function LikedPage({ songs, likedSongs, currentSong, isPlaying, playSong, toggleLike, isMobile, darkMode }) {
+function LikedPage({ songs, likedSongs, currentSong, isPlaying, playSong, toggleLike, isMobile, darkMode, handleAddToPlaylist }) {
   const liked = songs.filter(s => likedSongs.has(s.id));
   return (
     <>
@@ -272,9 +276,9 @@ function SongList({ songs, isLoading, likedSongs, currentSong, isPlaying, playSo
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {songs.map((s, i) => (
         <SongRow key={s.id} song={s} index={i}
-          active={active}
+          active={currentSong?.id === s.id}
           isPlaying={isPlaying}
-          liked={liked}
+          liked={likedSongs.has(s.id)}
           playSong={playSong}
           toggleLike={toggleLike}
           isMobile={isMobile}
@@ -286,12 +290,13 @@ function SongList({ songs, isLoading, likedSongs, currentSong, isPlaying, playSo
   );
 }
 
-function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, isMobile, handleAddToPlaylist }) {
+function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, isMobile, darkMode, handleAddToPlaylist }) {
   return (
     <div className="song-row" onClick={() => playSong(song)}
       style={{ display: "flex", alignItems: "center", gap: isMobile ? 12 : 14, padding: isMobile ? "10px 6px" : "6px 8px", borderRadius: 12, background: active ? "rgba(29,185,84,0.1)" : "transparent", cursor: "pointer", transition: "background 0.15s" }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+
       {!isMobile && (
         <div style={{ width: 20, textAlign: "center", flexShrink: 0, color: active ? "#1db954" : "#6b7280", fontSize: 13 }}>
           {active && isPlaying ? "▶" : index + 1}
@@ -316,9 +321,9 @@ function SongRow({ song, index, active, isPlaying, liked, playSong, toggleLike, 
         <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.artist}</div>
       </div>
 
-{handleAddToPlaylist && (
+      {handleAddToPlaylist && (
         <button onClick={e => { e.stopPropagation(); handleAddToPlaylist(song); }}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center" }}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#3a3a5a", flexShrink: 0, display: "flex", alignItems: "center", transition: "color 0.2s" }}
           onMouseEnter={e => e.currentTarget.style.color = "#1db954"}
           onMouseLeave={e => e.currentTarget.style.color = "#3a3a5a"}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
