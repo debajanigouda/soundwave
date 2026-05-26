@@ -1,134 +1,107 @@
 // src/hooks/useOfflineCache.js
-// Drop this file into src/hooks/useOfflineCache.js
-// Then import it in App.jsx:  import useOfflineCache from "./hooks/useOfflineCache";
-// And use it:  const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
+import { useState, useEffect, useCallback } from "react";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+const DB_NAME = "soundwave-audio";
+const STORE = "streams";
+const MAX = 20;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+const req = indexedDB.open(DB_NAME, 2);    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const s = db.createObjectStore(STORE, { keyPath: "youtubeId" });
+        s.createIndex("timestamp", "timestamp", { unique: false });
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveSong(song) {
+  const db = await openDB();
+  // Enforce max limit — delete oldest if needed
+  const all = await new Promise((res) => {
+    const tx = db.transaction(STORE, "readonly");
+    tx.objectStore(STORE).index("timestamp").getAll().onsuccess = (e) => res(e.target.result || []);
+  });
+  if (all.length >= MAX) {
+    all.sort((a, b) => a.timestamp - b.timestamp);
+    const delTx = db.transaction(STORE, "readwrite");
+    all.slice(0, all.length - MAX + 1).forEach((s) =>
+      delTx.objectStore(STORE).delete(s.youtubeId)
+    );
+  }
+  return new Promise((res) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put({ ...song, timestamp: Date.now() });
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => res(false);
+  });
+}
+
+async function getAllSongs() {
+  const db = await openDB();
+  return new Promise((res) => {
+    const tx = db.transaction(STORE, "readonly");
+    tx.objectStore(STORE).index("timestamp").getAll().onsuccess = (e) =>
+      res((e.target.result || []).sort((a, b) => b.timestamp - a.timestamp));
+  });
+}
+
+async function removeSong(youtubeId) {
+  const db = await openDB();
+  return new Promise((res) => {
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(youtubeId);
+    tx.oncomplete = () => res(true);
+  });
+}
 
 export default function useOfflineCache(currentSong, isPlaying) {
   const [cachedSongs, setCachedSongs] = useState([]);
-  const [cachedUrls, setCachedUrls] = useState(new Set());
-  const [swReady, setSwReady] = useState(false);
-  const swRef = useRef(null);
+  const [cachedIds, setCachedIds] = useState(new Set());
 
-  // ── Register SW message listener ──────────────────────────────────────
+  // Load cached songs on mount
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-
-    function onMessage(e) {
-      const { type, songs, url } = e.data || {};
-
-      if (type === "CACHED_SONGS_LIST") {
-        setCachedSongs(songs || []);
-        setCachedUrls(new Set((songs || []).map((s) => s.url)));
-      }
-
-      if (type === "AUDIO_CACHED") {
-        // A new song just got cached in the background — refresh list
-        refreshCachedList();
-        setCachedUrls((prev) => new Set([...prev, url]));
-      }
-
-      if (type === "DELETE_CACHED_SONG_ACK") {
-        setCachedUrls((prev) => {
-          const next = new Set(prev);
-          next.delete(url);
-          return next;
-        });
-        refreshCachedList();
-      }
-    }
-
-    navigator.serviceWorker.addEventListener("message", onMessage);
-
-    // Wait for SW to be active
-    navigator.serviceWorker.ready.then((reg) => {
-      swRef.current = reg.active;
-      setSwReady(true);
-      refreshCachedList();
+    getAllSongs().then((songs) => {
+      setCachedSongs(songs);
+      setCachedIds(new Set(songs.map((s) => s.youtubeId)));
     });
-
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, []);
 
-  // ── Refresh cached songs list from SW ─────────────────────────────────
-  const refreshCachedList = useCallback(() => {
-    if (!navigator.serviceWorker.controller) return;
-    navigator.serviceWorker.controller.postMessage({ type: "GET_CACHED_SONGS" });
-  }, []);
-
-  // ── When a song plays, tell SW to tag it with metadata ────────────────
+  // Auto-save song metadata when it plays for 30 seconds
   useEffect(() => {
-    if (!currentSong || !isPlaying || !navigator.serviceWorker.controller) return;
-
-    // Build the stream URL the same way your backend does
-    // Adjust this pattern to match your actual /api/stream/ URL format
-    const streamUrl = `${import.meta.env.VITE_API_URL || "https://soundwave-server.onrender.com"}/api/stream/${currentSong.youtubeId}`;
-
-    navigator.serviceWorker.controller.postMessage({
-      type: "CACHE_SONG",
-      data: {
-        url: streamUrl,
-        song: {
-          title: currentSong.title,
-          artist: currentSong.artist,
-          thumbnail: currentSong.thumbnail,
-          youtubeId: currentSong.youtubeId,
-        },
-      },
-    });
+    if (!currentSong || !isPlaying) return;
+    const timer = setTimeout(async () => {
+      await saveSong({
+        youtubeId: currentSong.youtubeId,
+        title: currentSong.title,
+        artist: currentSong.artist,
+        thumbnail: currentSong.thumbnail,
+        id: currentSong.id,
+      });
+      setCachedSongs(await getAllSongs());
+      setCachedIds((prev) => new Set([...prev, currentSong.youtubeId]));
+    }, 5000); // Save after 30 seconds of playing
+    return () => clearTimeout(timer);
   }, [currentSong?.youtubeId, isPlaying]);
 
-  // ── Check if a specific song is cached ───────────────────────────────
   const isCached = useCallback(
-    (youtubeId) => {
-      if (!youtubeId) return false;
-      return [...cachedUrls].some((url) => url.includes(youtubeId));
-    },
-    [cachedUrls]
+    (youtubeId) => cachedIds.has(youtubeId),
+    [cachedIds]
   );
 
-  // ── Delete a cached song ──────────────────────────────────────────────
-  const deleteCachedSong = useCallback((url) => {
-    if (!navigator.serviceWorker.controller) return;
-    navigator.serviceWorker.controller.postMessage({
-      type: "DELETE_CACHED_SONG",
-      data: { url },
+  const deleteCachedSong = useCallback(async (youtubeId) => {
+    await removeSong(youtubeId);
+    setCachedSongs(await getAllSongs());
+    setCachedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(youtubeId);
+      return next;
     });
   }, []);
 
-  // ── Manually trigger caching for a song (e.g. Download button) ───────
-  const cacheSong = useCallback(async (song) => {
-    if (!song?.youtubeId) return false;
-    const streamUrl = `${import.meta.env.VITE_API_URL || "https://soundwave-server.onrender.com"}/api/stream/${song.youtubeId}`;
-
-    try {
-      // Fetch the audio — SW will intercept and cache it automatically
-      const res = await fetch(streamUrl);
-      if (res.ok) {
-        // Tag with metadata
-        navigator.serviceWorker.controller?.postMessage({
-          type: "CACHE_SONG",
-          data: {
-            url: streamUrl,
-            song: { title: song.title, artist: song.artist, thumbnail: song.thumbnail, youtubeId: song.youtubeId },
-          },
-        });
-        return true;
-      }
-    } catch {
-      return false;
-    }
-    return false;
-  }, []);
-
-  return {
-    cachedSongs,     // Array of cached song objects with metadata — use on Downloads page
-    cachedUrls,      // Set of cached stream URLs
-    isCached,        // (youtubeId) => boolean — show download icon state
-    deleteCachedSong,// (url) => void — remove from cache
-    cacheSong,       // (song) => Promise<boolean> — manually cache a song
-    swReady,         // boolean — SW is active and ready
-    refreshCachedList,
-  };
+  return { cachedSongs, isCached, deleteCachedSong };
 }

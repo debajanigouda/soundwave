@@ -10,7 +10,7 @@ const SW_VERSION = "soundwave-v3";
 const SHELL_CACHE = `${SW_VERSION}-shell`;
 const THUMB_CACHE = `${SW_VERSION}-thumbs`;
 const DB_NAME = "soundwave-audio";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "streams";
 const MAX_CACHED_SONGS = 20;
 
