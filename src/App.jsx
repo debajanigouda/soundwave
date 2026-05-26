@@ -10,6 +10,7 @@ import Auth from "./components/Auth";
 import { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
+import useOfflineCache from "./hooks/useOfflineCache";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
@@ -33,6 +34,7 @@ const [showAddToPlaylist, setShowAddToPlaylist] = useState(false);
 const [selectedSong, setSelectedSong] = useState(null);
 const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const { cachedSongs, isCached, deleteCachedSong, cacheSong } = useOfflineCache(currentSong, isPlaying);
 
   // Sleep timer
   const [sleepMinutes, setSleepMinutes] = useState(null);
@@ -308,6 +310,10 @@ async function handleCreatePlaylist(name, emoji) {
     setShowAddToPlaylist,
     selectedSong,
     toast,
+    cachedSongs,
+isCached,
+deleteCachedSong,
+cacheSong,
 };
 
   if (authLoading) {
