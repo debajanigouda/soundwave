@@ -693,25 +693,59 @@ function FullScreenPlayer({
   );
 }
 function LyricsPanel({ currentSong, progress }) {
-  const [lyrics, setLyrics] = useState(null);
+  const [lyrics, setLyrics] = useState([]);
+  const [plainLyrics, setPlainLyrics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
+  const [synced, setSynced] = useState(false);
+  const activeRef = useRef(null);
 
   useEffect(() => {
     if (!currentSong) return;
-    setLyrics(null);
+    setLyrics([]); setPlainLyrics(null); setSynced(false);
     setLoading(true);
-    const artist = encodeURIComponent(currentSong.artist || "");
-    const title = encodeURIComponent(currentSong.title || "");
+    const artist = encodeURIComponent((currentSong.artist || "").split(" official")[0]);
+    const title = encodeURIComponent((currentSong.title || "").replace(/\(.*?\)/g, "").trim());
+
     fetch(`https://lrclib.net/api/get?artist_name=${artist}&track_name=${title}`)
       .then(r => r.json())
       .then(data => {
-        if (data.plainLyrics) setLyrics(data.plainLyrics);
-        else setLyrics(null);
+        if (data.syncedLyrics) {
+          // Parse synced lyrics "[mm:ss.xx] line"
+          const lines = data.syncedLyrics.split("\n").map(line => {
+            const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+            if (!match) return null;
+            const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
+            return { time, text: match[3].trim() };
+          }).filter(Boolean);
+          setLyrics(lines);
+          setSynced(true);
+          setLoading(false);
+        } else if (data.plainLyrics) {
+          setPlainLyrics(data.plainLyrics);
+          setLoading(false);
+        } else {
+          // Fallback to lyrics.ovh for Hindi songs
+          return fetch(`https://api.lyrics.ovh/v1/${artist}/${title}`)
+            .then(r => r.json())
+            .then(d => {
+              if (d.lyrics) setPlainLyrics(d.lyrics);
+              setLoading(false);
+            });
+        }
       })
-      .catch(() => setLyrics(null))
-      .finally(() => setLoading(false));
+      .catch(() => setLoading(false));
   }, [currentSong?.id]);
+
+  // Auto-scroll active line into view
+  useEffect(() => {
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [progress]);
+
+  // Find active line index
+  const activeIdx = synced ? lyrics.reduce((acc, line, i) => line.time <= progress ? i : acc, -1) : -1;
 
   if (!show) return (
     <div style={{ textAlign: "center", padding: "0 28px 8px" }}>
@@ -723,15 +757,41 @@ function LyricsPanel({ currentSong, progress }) {
   );
 
   return (
-    <div style={{ margin: "0 20px 12px", background: "rgba(0,0,0,0.4)", borderRadius: 16, padding: "16px", maxHeight: 180, overflowY: "auto" }}>
+    <div style={{ margin: "0 20px 12px", background: "rgba(0,0,0,0.5)", borderRadius: 16, padding: "16px", maxHeight: 200, overflowY: "auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#1db954", letterSpacing: 1, textTransform: "uppercase" }}>Lyrics</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1db954", letterSpacing: 1, textTransform: "uppercase" }}>
+          {synced ? "⚡ Live Lyrics" : "Lyrics"}
+        </div>
         <button onClick={() => setShow(false)} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18 }}>×</button>
       </div>
-      {loading && <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center" }}>Loading lyrics...</div>}
-      {!loading && !lyrics && <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center" }}>No lyrics found for this song</div>}
-      {!loading && lyrics && (
-        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 1.8, whiteSpace: "pre-line" }}>{lyrics}</div>
+
+      {loading && <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center", padding: "20px 0" }}>Loading lyrics...</div>}
+
+      {!loading && !synced && !plainLyrics && (
+        <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center", padding: "20px 0" }}>No lyrics found</div>
+      )}
+
+      {!loading && synced && lyrics.map((line, i) => (
+        <div key={i}
+          ref={i === activeIdx ? activeRef : null}
+          style={{
+            fontSize: i === activeIdx ? 16 : 13,
+            fontWeight: i === activeIdx ? 700 : 400,
+            color: i === activeIdx ? "#fff" : "rgba(255,255,255,0.3)",
+            lineHeight: 1.8,
+            padding: "2px 0",
+            transition: "all 0.3s ease",
+            transform: i === activeIdx ? "scale(1.03)" : "scale(1)",
+            transformOrigin: "left",
+          }}>
+          {line.text || "♪"}
+        </div>
+      ))}
+
+      {!loading && !synced && plainLyrics && (
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", lineHeight: 1.8, whiteSpace: "pre-line" }}>
+          {plainLyrics}
+        </div>
       )}
     </div>
   );
