@@ -241,10 +241,14 @@ function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, pla
       )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: 14, marginBottom: 36 }}>
         {playlists.map(p => (
-          <div key={p.id}
-            style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.background = cardHov}
-            onMouseLeave={e => e.currentTarget.style.background = cardBg}>
+  <div key={p.id}
+    onClick={() => {
+      const songs = p.playlist_songs?.map(ps => ps.songs || ps).filter(Boolean);
+      if (songs?.length > 0) playSong(songs[0]);
+    }}
+    style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s" }}
+    onMouseEnter={e => e.currentTarget.style.background = cardHov}
+    onMouseLeave={e => e.currentTarget.style.background = cardBg}>
             <div style={{ width: "100%", aspectRatio: "1", borderRadius: 12, background: p.color || "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 10 }}>
               {p.cover_emoji || p.emoji || "🎵"}
             </div>
