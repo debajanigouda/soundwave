@@ -189,7 +189,9 @@ const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong,
 
   async function loadTrending() {
     setIsLoading(true);
-    setSongs(await getTrending());
+    setSongs(await getTrending((isWaking) => {
+  setToast(isWaking ? "⏳ Server waking up, please wait..." : null);
+}));
     setIsLoading(false);
   }
 
