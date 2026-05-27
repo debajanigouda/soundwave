@@ -12,6 +12,7 @@ import { ThemeContext } from "./ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
 import useOfflineCache from "./hooks/useOfflineCache";
 import Logo from "./components/Logo";
+import { MiniPlayer } from "./components/Player";
 
 export default function App() {
   const [songs, setSongs] = useState([]);

@@ -261,3 +261,42 @@ function IconBtn({ onClick, active, title, children }) {
     </button>
   );
 }
+export function MiniPlayer({ currentSong, isPlaying, togglePlay, playNext, playPrev, onExpand, likedSongs, toggleLike }) {
+  if (!currentSong) return null;
+  const liked = likedSongs?.has(currentSong.id);
+  return (
+    <div onClick={onExpand} style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "10px 16px", background: "#161622",
+      borderTop: "1px solid rgba(255,255,255,0.08)",
+      cursor: "pointer", flexShrink: 0,
+    }}>
+      <img src={currentSong.thumbnail} alt={currentSong.title}
+        style={{ width: 42, height: 42, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.title}</div>
+        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{currentSong.artist}</div>
+      </div>
+      <button onClick={e => { e.stopPropagation(); toggleLike(currentSong.id); }}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: liked ? "#1db954" : "#6b7280", flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+      </button>
+      <button onClick={e => { e.stopPropagation(); playPrev(); }}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#fff", flexShrink: 0 }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+      </button>
+      <button onClick={e => { e.stopPropagation(); togglePlay(); }}
+        style={{ width: 38, height: 38, borderRadius: "50%", background: "#1db954", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {isPlaying
+          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="#000"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          : <svg width="16" height="16" viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg>}
+      </button>
+      <button onClick={e => { e.stopPropagation(); playNext(); }}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: 8, color: "#fff", flexShrink: 0 }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2.5-6 8.5 6V6z"/></svg>
+      </button>
+    </div>
+  );
+}
