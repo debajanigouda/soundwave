@@ -242,10 +242,22 @@ function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, pla
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: 14, marginBottom: 36 }}>
         {playlists.map(p => (
   <div key={p.id}
-    onClick={() => {
-      const songs = p.playlist_songs?.map(ps => ps.songs || ps).filter(Boolean);
-      if (songs?.length > 0) playSong(songs[0]);
-    }}
+   onClick={() => {
+  const playlistSongs = p.playlist_songs
+    ?.map(ps => {
+      const s = ps.songs || ps;
+      // Fix field names from Supabase format to app format
+      return {
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        thumbnail: s.thumbnail,
+        youtubeId: s.youtubeId || s.youtube_id,
+      };
+    })
+    .filter(s => s.youtubeId);
+  if (playlistSongs?.length > 0) playSong(playlistSongs[0]);
+}}
     style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s" }}
     onMouseEnter={e => e.currentTarget.style.background = cardHov}
     onMouseLeave={e => e.currentTarget.style.background = cardBg}>
