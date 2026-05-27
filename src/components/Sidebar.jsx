@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { ThemeContext } from "../ThemeContext";
 import ThemeToggle from "./ThemeToggle";
+import Logo from "./Logo";
 
 const GRAD = "linear-gradient(135deg,#6c63ff,#ff6b9d)";
 
@@ -32,10 +33,9 @@ export default function Sidebar({ currentPage, setCurrentPage, playlists, likedC
     }}>
 
       {/* Logo */}
-      <div style={{ padding: "28px 24px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 36, height: 36, background: GRAD, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>♪</div>
-        <span style={{ fontFamily: "'Clash Display',sans-serif", fontSize: 20, fontWeight: 700, background: GRAD, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</span>
-      </div>
+      <div style={{ padding: "24px 24px 20px", flexShrink: 0 }}>
+  <Logo size={38} textSize={20} />
+</div>
 
       {/* Nav */}
       <nav style={{ padding: "0 12px", flex: 1, overflowY: "auto" }}>

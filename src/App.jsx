@@ -11,6 +11,7 @@ import { useContext } from "react";
 import { ThemeContext } from "./ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
 import useOfflineCache from "./hooks/useOfflineCache";
+import Logo from "./components/Logo";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
@@ -316,15 +317,61 @@ deleteCachedSong,
 };
 
   if (authLoading) {
-    return (
-      <div style={{ height: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 60, height: 60, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 16px" }}>♪</div>
-          <div style={{ color: "#606080", fontSize: 14 }}>Loading SoundWave...</div>
+  return (
+    <div style={{
+      height: "100vh", background: "#0a0a0f",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      flexDirection: "column", gap: 0,
+    }}>
+      <div style={{ textAlign: "center" }}>
+        {/* Animated logo */}
+        <div style={{
+          width: 80, height: 80,
+          background: "linear-gradient(135deg, #6c63ff, #ff6b9d)",
+          borderRadius: 22, margin: "0 auto 20px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 8px 32px rgba(108,99,255,0.5)",
+          animation: "logoPulse 2s ease infinite",
+          position: "relative", overflow: "hidden",
+        }}>
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "50%", background: "rgba(255,255,255,0.12)", borderRadius: "22px 22px 0 0" }} />
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none">
+            <circle cx="8.5" cy="17.5" r="3.5" fill="white"/>
+            <rect x="11.5" y="5" width="2.5" height="13" rx="1.25" fill="white"/>
+            <rect x="11.5" y="5" width="9" height="2.5" rx="1.25" fill="white"/>
+          </svg>
+        </div>
+        <div style={{
+          fontSize: 28, fontWeight: 800, letterSpacing: -1, marginBottom: 6,
+          background: "linear-gradient(135deg, #6c63ff, #ff6b9d)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        }}>SoundWave</div>
+        <div style={{ color: "#6b7280", fontSize: 13, letterSpacing: 2, textTransform: "uppercase", marginBottom: 32 }}>Every Song. Every World.</div>
+
+        {/* Loading dots */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: "linear-gradient(135deg, #6c63ff, #ff6b9d)",
+              animation: `dotBounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }} />
+          ))}
         </div>
       </div>
-    );
-  }
+      <style>{`
+        @keyframes logoPulse {
+          0%, 100% { box-shadow: 0 8px 32px rgba(108,99,255,0.5); transform: scale(1); }
+          50% { box-shadow: 0 12px 48px rgba(255,107,157,0.6); transform: scale(1.04); }
+        }
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+          40% { transform: scale(1.2); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
 
   if (!user) return <Auth onLogin={setUser} />;
 
@@ -384,21 +431,27 @@ function MobileLayout(props) {
     { id: "liked",   label: "Liked",   Icon: HeartIcon },
   ];
 
-  const pageTitle = {
-    home: "Good vibes 🎵", search: "Discover",
-    library: "Library", liked: "Liked Songs",
-  }[currentPage] || "SoundWave";
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", background: "#0a0a0f", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px 10px", flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, letterSpacing: 1 }}>SOUNDWAVE</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>{pageTitle}</div>
-        </div>
+
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "14px 20px 10px", flexShrink: 0,
+        background: "linear-gradient(180deg, rgba(10,10,15,0.98) 0%, rgba(10,10,15,0) 100%)",
+      }}>
+        <Logo size={34} textSize={18} />
         <button onClick={() => setShowDrawer(true)}
-          style={{ background: "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "#a0a0b8" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 12, cursor: "pointer",
+            padding: "8px 10px", color: "#a0a0b8",
+            transition: "all 0.2s ease",
+          }}
+          onTouchStart={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+          onTouchEnd={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="3" y1="6" x2="21" y2="6"/>
             <line x1="3" y1="12" x2="21" y2="12"/>
             <line x1="3" y1="18" x2="21" y2="18"/>
@@ -406,80 +459,45 @@ function MobileLayout(props) {
         </button>
       </div>
 
+      {/* Main scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
         <MainContent {...props} />
       </div>
 
+      {/* Mini player */}
       {props.currentSong && <MiniPlayer {...props} onExpand={() => setShowFullPlayer(true)} />}
 
+      {/* Bottom nav */}
       <nav style={{ display: "flex", background: "#0d0d18", borderTop: "1px solid rgba(255,255,255,0.06)", paddingBottom: "env(safe-area-inset-bottom, 8px)", flexShrink: 0 }}>
-  {tabs.map(({ id, label, Icon }) => {
-    const active = currentPage === id;
-    return (
-      <button key={id} onClick={() => setCurrentPage(id)}
-        style={{
-          flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-          justifyContent: "center", gap: 4, padding: "10px 0",
-          background: "none", border: "none", cursor: "pointer",
-          color: active ? "#1db954" : "#6b7280",
-          position: "relative",
-          transition: "color 0.2s ease",
-        }}>
-        {active && (
-          <div style={{
-            position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
-            width: 32, height: 2, background: "#1db954", borderRadius: "0 0 4px 4px",
-            boxShadow: "0 0 8px rgba(29,185,84,0.6)",
-          }} />
-        )}
-        <div style={{ transform: active ? "scale(1.1)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
-          <Icon size={22} active={active} />
-        </div>
-        <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, fontFamily: "inherit", letterSpacing: active ? 0.3 : 0 }}>{label}</span>
-      </button>
-    );
-  })}
-</nav>
+        {tabs.map(({ id, label, Icon }) => {
+          const active = currentPage === id;
+          return (
+            <button key={id} onClick={() => setCurrentPage(id)}
+              style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+                justifyContent: "center", gap: 4, padding: "10px 0",
+                background: "none", border: "none", cursor: "pointer",
+                color: active ? "#1db954" : "#6b7280",
+                position: "relative", transition: "color 0.2s ease",
+              }}>
+              {active && (
+                <div style={{
+                  position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+                  width: 32, height: 2, background: "#1db954", borderRadius: "0 0 4px 4px",
+                  boxShadow: "0 0 8px rgba(29,185,84,0.6)",
+                }} />
+              )}
+              <div style={{ transform: active ? "scale(1.1)" : "scale(1)", transition: "transform 0.2s cubic-bezier(0.34,1.56,0.64,1)" }}>
+                <Icon size={22} active={active} />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, fontFamily: "inherit", letterSpacing: active ? 0.3 : 0 }}>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {showFullPlayer && <FullScreenPlayer {...props} onClose={() => setShowFullPlayer(false)} />}
       {showDrawer && <MobileDrawer {...props} onClose={() => setShowDrawer(false)} onLogout={props.onLogout} />}
-    </div>
-  );
-}
-
-function MiniPlayer({ currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong, progress, duration, onExpand }) {
-  const pct = duration ? (progress / duration) * 100 : 0;
-  return (
-    <div style={{ margin: "0 10px 6px", background: "linear-gradient(135deg, #1c1c2e, #16162a)", borderRadius: 18, overflow: "hidden", flexShrink: 0, boxShadow: "0 -2px 20px rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ height: 2, background: "rgba(255,255,255,0.08)" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, #1db954, #1ed760)", transition: "width 1s linear", borderRadius: 2 }} />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 12 }}>
-        <div style={{ position: "relative", flexShrink: 0 }} onClick={onExpand}>
-          <img src={currentSong.thumbnail} alt={currentSong.title}
-            style={{ width: 46, height: 46, borderRadius: 12, objectFit: "cover", display: "block", cursor: "pointer" }} />
-          {isBuffering && (
-            <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <div style={{ width: 16, height: 16, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            </div>
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={onExpand}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>{currentSong.title}</div>
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong.artist}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}><PrevIcon size={18} /></button>
-          <button onClick={togglePlay}
-            style={{ width: 42, height: 42, borderRadius: "50%", background: "#1db954", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 12px rgba(29,185,84,0.4)" }}>
-            {isBuffering
-              ? <div style={{ width: 16, height: 16, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              : isPlaying ? <PauseIcon size={18} color="#000" /> : <PlayIcon size={18} color="#000" />}
-          </button>
-          <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#a0a0b8", padding: 8, display: "flex" }}><NextIcon size={18} /></button>
-        </div>
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }
@@ -677,8 +695,8 @@ function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onCl
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)" }} />
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 300, background: "#111118", display: "flex", flexDirection: "column", boxShadow: "4px 0 32px rgba(0,0,0,0.5)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 16px" }}>
-          <div style={{ fontSize: 20, fontWeight: 800, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, width: 34, height: 34, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+<Logo size={32} textSize={17} />          
+<button onClick={onClose} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, width: 34, height: 34, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px" }}>
           {[
