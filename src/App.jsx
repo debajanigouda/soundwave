@@ -704,33 +704,62 @@ function LyricsPanel({ currentSong, progress }) {
     if (!currentSong) return;
     setLyrics([]); setPlainLyrics(null); setSynced(false);
     setLoading(true);
-    const artist = encodeURIComponent((currentSong.artist || "").split(" official")[0]);
-    const title = encodeURIComponent((currentSong.title || "").replace(/\(.*?\)/g, "").trim());
 
+    // Clean up title — remove "official audio/video" etc
+    const cleanTitle = (currentSong.title || "")
+      .replace(/\(official.*?\)/gi, "")
+      .replace(/\[official.*?\]/gi, "")
+      .replace(/official (audio|video|music video|lyric)/gi, "")
+      .replace(/\|.*$/, "")
+      .replace(/ft\..*$/i, "")
+      .trim();
+
+    const cleanArtist = (currentSong.artist || "")
+      .replace(/VEVO|Music|Records|Official|India|T-Series|Sony|Universal/gi, "")
+      .trim();
+
+    const artist = encodeURIComponent(cleanArtist);
+    const title = encodeURIComponent(cleanTitle);
+    const titleOnly = encodeURIComponent(cleanTitle);
+
+    // Try 1: lrclib with artist + title (synced)
     fetch(`https://lrclib.net/api/get?artist_name=${artist}&track_name=${title}`)
       .then(r => r.json())
       .then(data => {
         if (data.syncedLyrics) {
-          // Parse synced lyrics "[mm:ss.xx] line"
           const lines = data.syncedLyrics.split("\n").map(line => {
             const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
             if (!match) return null;
             const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
             return { time, text: match[3].trim() };
           }).filter(Boolean);
-          setLyrics(lines);
-          setSynced(true);
-          setLoading(false);
+          setLyrics(lines); setSynced(true); setLoading(false);
         } else if (data.plainLyrics) {
-          setPlainLyrics(data.plainLyrics);
-          setLoading(false);
+          setPlainLyrics(data.plainLyrics); setLoading(false);
         } else {
-          // Fallback to lyrics.ovh for Hindi songs
-          return fetch(`https://api.lyrics.ovh/v1/${artist}/${title}`)
+          // Try 2: lrclib search by title only
+          return fetch(`https://lrclib.net/api/search?q=${titleOnly}`)
             .then(r => r.json())
-            .then(d => {
-              if (d.lyrics) setPlainLyrics(d.lyrics);
-              setLoading(false);
+            .then(results => {
+              if (results?.[0]?.syncedLyrics) {
+                const lines = results[0].syncedLyrics.split("\n").map(line => {
+                  const match = line.match(/\[(\d+):(\d+\.\d+)\](.*)/);
+                  if (!match) return null;
+                  const time = parseInt(match[1]) * 60 + parseFloat(match[2]);
+                  return { time, text: match[3].trim() };
+                }).filter(Boolean);
+                setLyrics(lines); setSynced(true); setLoading(false);
+              } else if (results?.[0]?.plainLyrics) {
+                setPlainLyrics(results[0].plainLyrics); setLoading(false);
+              } else {
+                // Try 3: lyrics.ovh fallback
+                return fetch(`https://api.lyrics.ovh/v1/${artist}/${titleOnly}`)
+                  .then(r => r.json())
+                  .then(d => {
+                    if (d.lyrics) setPlainLyrics(d.lyrics);
+                    setLoading(false);
+                  });
+              }
             });
         }
       })
