@@ -613,7 +613,8 @@ function FullScreenPlayer({
             <img src={currentSong?.thumbnail} alt={currentSong?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         </div>
-
+{/* Lyrics */}
+<LyricsPanel currentSong={currentSong} progress={progress} />
         {/* Controls */}
         <div style={{ flexShrink: 0, padding: "0 28px 16px" }}>
           {/* Title + share */}
@@ -691,7 +692,50 @@ function FullScreenPlayer({
     </div>
   );
 }
+function LyricsPanel({ currentSong, progress }) {
+  const [lyrics, setLyrics] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
 
+  useEffect(() => {
+    if (!currentSong) return;
+    setLyrics(null);
+    setLoading(true);
+    const artist = encodeURIComponent(currentSong.artist || "");
+    const title = encodeURIComponent(currentSong.title || "");
+    fetch(`https://lrclib.net/api/get?artist_name=${artist}&track_name=${title}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.plainLyrics) setLyrics(data.plainLyrics);
+        else setLyrics(null);
+      })
+      .catch(() => setLyrics(null))
+      .finally(() => setLoading(false));
+  }, [currentSong?.id]);
+
+  if (!show) return (
+    <div style={{ textAlign: "center", padding: "0 28px 8px" }}>
+      <button onClick={() => setShow(true)}
+        style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 20, padding: "8px 24px", color: "rgba(255,255,255,0.6)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>
+        🎵 Show Lyrics
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ margin: "0 20px 12px", background: "rgba(0,0,0,0.4)", borderRadius: 16, padding: "16px", maxHeight: 180, overflowY: "auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#1db954", letterSpacing: 1, textTransform: "uppercase" }}>Lyrics</div>
+        <button onClick={() => setShow(false)} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18 }}>×</button>
+      </div>
+      {loading && <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center" }}>Loading lyrics...</div>}
+      {!loading && !lyrics && <div style={{ color: "#6b7280", fontSize: 13, textAlign: "center" }}>No lyrics found for this song</div>}
+      {!loading && lyrics && (
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 1.8, whiteSpace: "pre-line" }}>{lyrics}</div>
+      )}
+    </div>
+  );
+}
 function MobileDrawer({ currentPage, setCurrentPage, playlists, likedSongs, onClose, onLogout }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9998 }}>
