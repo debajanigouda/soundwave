@@ -332,16 +332,31 @@ useEffect(() => {
     });
   }
 
-  function shareSong(song) {
-    if (!song) return;
-    const text = `🎵 Listening to "${song.title}" by ${song.artist} on SoundWave!\nhttps://soundwave-chi.vercel.app`;
-    if (navigator.share) {
-      navigator.share({ title: song.title, text, url: "https://soundwave-chi.vercel.app" }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text).then(() => alert("Link copied to clipboard!"));
+  async function shareSong(song) {
+  if (!song) return;
+  const text = `🎵 Listening to "${song.title}" by ${song.artist} on SoundWave!\nhttps://soundwave-chi.vercel.app`;
+  const shareData = { title: song.title, text, url: "https://soundwave-chi.vercel.app" };
+
+  // Try native share sheet (works on mobile & some desktop browsers)
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return; // success — done
+    } catch (err) {
+      if (err.name === "AbortError") return; // user cancelled — that's fine
+      // fall through to clipboard fallback
     }
   }
 
+  // Clipboard fallback (desktop browsers)
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("🔗 Link copied to clipboard!");
+  } catch (err) {
+    // Last resort — prompt box (works everywhere, no permissions needed)
+    window.prompt("Copy this link to share:", "https://soundwave-chi.vercel.app");
+  }
+}
   function showToast(msg) {
   setToast(msg);
   setTimeout(() => setToast(null), 2500);
