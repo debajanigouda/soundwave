@@ -85,6 +85,82 @@ const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong,
     return () => clearInterval(sleepRef.current);
   }, [sleepMinutes]);
 
+  // ── KEYBOARD SHORTCUTS ────────────────────────────────────
+useEffect(() => {
+  function handleKeyDown(e) {
+    // Don't trigger if user is typing in an input
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    if (tag === "input" || tag === "textarea") return;
+
+    switch (e.code) {
+      case "Space":
+        e.preventDefault();
+        togglePlay();
+        break;
+      case "ArrowRight":
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Shift + Right = next song
+          nextSong();
+        } else {
+          // Right = seek forward 10 seconds
+          if (playerRef.current?.seekTo && duration) {
+            const newTime = Math.min(progress + 10, duration);
+            playerRef.current.seekTo(newTime, true);
+            setProgress(newTime);
+          }
+        }
+        break;
+      case "ArrowLeft":
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Shift + Left = previous song
+          prevSong();
+        } else {
+          // Left = seek backward 10 seconds
+          if (playerRef.current?.seekTo && duration) {
+            const newTime = Math.max(progress - 10, 0);
+            playerRef.current.seekTo(newTime, true);
+            setProgress(newTime);
+          }
+        }
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        // Up = volume up
+        setVolume(v => Math.min(1, v + 0.1));
+        setIsMuted(false);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        // Down = volume down
+        setVolume(v => Math.max(0, v - 0.1));
+        break;
+      case "KeyM":
+        // M = mute/unmute
+        setIsMuted(m => !m);
+        break;
+      case "KeyS":
+        // S = shuffle
+        setIsShuffle(s => !s);
+        break;
+      case "KeyR":
+        // R = repeat
+        setIsRepeat(r => !r);
+        break;
+      case "KeyL":
+        // L = like current song
+        if (currentSong) toggleLike(currentSong.id);
+        break;
+      default:
+        break;
+    }
+  }
+
+  window.addEventListener("keydown", handleKeyDown);
+  return () => window.removeEventListener("keydown", handleKeyDown);
+}, [progress, duration, currentSong, togglePlay, nextSong, prevSong]);
+
   function startProgressTracking() {
     stopProgressTracking();
     progressInterval.current = setInterval(() => {

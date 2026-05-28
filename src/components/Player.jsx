@@ -220,6 +220,39 @@ export default function Player({
             style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.1)", borderRadius: 4, cursor: "pointer", maxWidth: 90, transition: "height 0.15s ease", position: "relative" }}>
             <div style={{ width: `${isMuted ? 0 : volume * 100}%`, height: "100%", background: "linear-gradient(90deg, #6b7280, #fff)", borderRadius: 4, transition: "width 0.1s" }} />
           </div>
+          {/* Keyboard hints tooltip */}
+<div style={{ position: "relative" }}>
+  <button
+    style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 6, display: "flex", fontSize: 13, transition: "color 0.2s" }}
+    title="Keyboard shortcuts"
+    onMouseEnter={e => { e.currentTarget.style.color = "#fff"; e.currentTarget.nextSibling.style.display = "block"; }}
+    onMouseLeave={e => { e.currentTarget.style.color = "#6b7280"; e.currentTarget.nextSibling.style.display = "none"; }}>
+    ⌨️
+  </button>
+  <div style={{
+    display: "none", position: "absolute", bottom: 44, right: 0,
+    background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 12, padding: "12px 16px", width: 220,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.5)", zIndex: 100,
+  }}>
+    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 10, letterSpacing: 0.5 }}>Keyboard Shortcuts</div>
+    {[
+      ["Space", "Play / Pause"],
+      ["← →", "Seek 10 seconds"],
+      ["⇧ + ← →", "Prev / Next song"],
+      ["↑ ↓", "Volume"],
+      ["M", "Mute"],
+      ["S", "Shuffle"],
+      ["R", "Repeat"],
+      ["L", "Like song"],
+    ].map(([key, action]) => (
+      <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 7 }}>
+        <kbd style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: "2px 8px", fontSize: 11, color: "#a0a0b8", fontFamily: "monospace" }}>{key}</kbd>
+        <span style={{ fontSize: 11, color: "#6b7280" }}>{action}</span>
+      </div>
+    ))}
+  </div>
+</div>
         </div>
       </footer>
     </>
