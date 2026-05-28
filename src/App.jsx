@@ -408,6 +408,7 @@ async function handleCreatePlaylist(name, emoji) {
     cachedSongs,
 isCached,
 deleteCachedSong,
+shareSong,
 };
 
   if (authLoading) {
