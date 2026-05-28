@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import { ThemeContext } from "../ThemeContext";
+import AiDiscovery from "./AiDiscovery";
 
 export default function MainContent({
   currentPage, searchQuery, handleSearch, songs, likedSongs, currentSong,
@@ -121,6 +122,16 @@ function HomePage({ songs, isLoading, likedSongs, currentSong, isPlaying, playSo
 
   return (
     <>
+    <AiDiscovery
+  playSong={playSong}
+  currentSong={currentSong}
+  isPlaying={isPlaying}
+  likedSongs={likedSongs}
+  toggleLike={toggleLike}
+  darkMode={darkMode}
+  isMobile={isMobile}
+  handleAddToPlaylist={handleAddToPlaylist}
+/>
       {isMobile && featured.length > 0 && (
         <>
           <SectionTitle title="Featured" darkMode={darkMode} />
