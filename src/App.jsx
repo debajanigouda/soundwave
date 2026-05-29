@@ -222,8 +222,15 @@ useEffect(() => {
     if (!currentSong || !("mediaSession" in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title, artist: currentSong.artist,
-      artwork: [{ src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" }],
-    });
+artwork: [
+  { src: currentSong.thumbnail, sizes: "96x96",   type: "image/jpeg" },
+  { src: currentSong.thumbnail, sizes: "128x128",  type: "image/jpeg" },
+  { src: currentSong.thumbnail, sizes: "192x192",  type: "image/jpeg" },
+  { src: currentSong.thumbnail, sizes: "256x256",  type: "image/jpeg" },
+  { src: currentSong.thumbnail, sizes: "384x384",  type: "image/jpeg" },
+  { src: currentSong.thumbnail, sizes: "512x512",  type: "image/jpeg" },
+  ],
+});
     navigator.mediaSession.setActionHandler("play", () => togglePlay());
     navigator.mediaSession.setActionHandler("pause", () => togglePlay());
     navigator.mediaSession.setActionHandler("nexttrack", () => nextSong());
