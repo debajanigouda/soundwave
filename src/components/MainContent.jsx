@@ -1,6 +1,7 @@
 import { useContext } from "react";
 import { ThemeContext } from "../ThemeContext";
 import AiDiscovery from "./AiDiscovery";
+import { useContext, useState, useEffect, useRef } from "react";
 
 export default function MainContent({
   currentPage, searchQuery, handleSearch, songs, likedSongs, currentSong,
@@ -84,31 +85,200 @@ function DesktopSearchHeader({ searchQuery, handleSearch, isShuffle, setIsShuffl
 }
 
 function SearchBar({ searchQuery, handleSearch, darkMode }) {
+  const [inputValue, setInputValue] = useState(searchQuery || "");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const debounceRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Sync inputValue with searchQuery from outside
+  useEffect(() => {
+    setInputValue(searchQuery || "");
+  }, [searchQuery]);
+
+  // Debounced suggestions fetch
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!inputValue.trim() || inputValue.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const API = import.meta.env.VITE_API_URL || "https://soundwave-server.onrender.com";
+        const res = await fetch(`${API}/api/search?q=${encodeURIComponent(inputValue)}`);
+        const data = await res.json();
+        if (data.success && data.songs?.length > 0) {
+          setSuggestions(data.songs.slice(0, 5));
+          setShowSuggestions(true);
+        }
+      } catch (e) {
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [inputValue]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleInputChange(val) {
+    setInputValue(val);
+    if (!val.trim()) {
+      handleSearch("");
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }
+
+  function handleSubmit() {
+    if (!inputValue.trim()) return;
+    setShowSuggestions(false);
+    handleSearch(inputValue);
+  }
+
+  function handleSuggestionClick(song) {
+    setInputValue(song.title);
+    setShowSuggestions(false);
+    handleSearch(song.title);
+  }
+
+  function handleClear() {
+    setInputValue("");
+    setSuggestions([]);
+    setShowSuggestions(false);
+    handleSearch("");
+  }
+
   return (
-    <div style={{
-      flex: 1, display: "flex", alignItems: "center", gap: 10,
-      background: darkMode ? "#1a1a28" : "#ffffff",
-      border: `1px solid ${darkMode ? "#2a2a3e" : "#ddd"}`,
-      borderRadius: 14, padding: "0 16px", height: 46,
-    }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <input
-        value={searchQuery}
-        onChange={e => handleSearch(e.target.value)}
-        placeholder="Songs, artists, albums..."
-        style={{
-          flex: 1, background: "none", border: "none", outline: "none",
-          color: darkMode ? "#fff" : "#111", fontSize: 15, fontFamily: "inherit",
-        }}
-      />
-      {searchQuery && (
-        <button onClick={() => handleSearch("")}
-          style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 20, lineHeight: 1, display: "flex" }}>
-          ×
-        </button>
+    <div ref={containerRef} style={{ flex: 1, position: "relative" }}>
+      {/* Search input */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: darkMode ? "#1a1a28" : "#ffffff",
+        border: `1px solid ${showSuggestions && suggestions.length > 0
+          ? "#6c63ff"
+          : darkMode ? "#2a2a3e" : "#ddd"}`,
+        borderRadius: showSuggestions && suggestions.length > 0 ? "14px 14px 0 0" : 14,
+        padding: "0 16px", height: 46,
+        transition: "border-color 0.2s, border-radius 0.2s",
+      }}>
+        {isLoadingSuggestions ? (
+          <div style={{ width: 16, height: 16, border: "2px solid #6c63ff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        )}
+        <input
+          value={inputValue}
+          onChange={e => handleInputChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") handleSubmit();
+            if (e.key === "Escape") { setShowSuggestions(false); }
+          }}
+          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+          placeholder="Songs, artists, albums..."
+          style={{
+            flex: 1, background: "none", border: "none", outline: "none",
+            color: darkMode ? "#fff" : "#111", fontSize: 15, fontFamily: "inherit",
+          }}
+        />
+        {inputValue && (
+          <button onClick={handleClear}
+            style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 20, lineHeight: 1, display: "flex", flexShrink: 0 }}>
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Suggestions dropdown */}
+      {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 100,
+          background: darkMode ? "#1a1a28" : "#ffffff",
+          border: `1px solid #6c63ff`,
+          borderTop: `1px solid ${darkMode ? "#2a2a3e" : "#eee"}`,
+          borderRadius: "0 0 14px 14px",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+          animation: "suggestionsDrop 0.15s ease",
+        }}>
+          {suggestions.map((song, i) => (
+            <div key={song.id} onClick={() => handleSuggestionClick(song)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 16px", cursor: "pointer",
+                borderBottom: i < suggestions.length - 1
+                  ? `1px solid ${darkMode ? "rgba(255,255,255,0.05)" : "#f0f0f0"}`
+                  : "none",
+                transition: "background 0.1s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = darkMode ? "rgba(108,99,255,0.1)" : "#f5f0ff"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+              <img src={song.thumbnail} alt={song.title}
+                style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
+                onError={e => { e.target.style.background = "#6c63ff"; e.target.src = ""; }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#fff" : "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {song.title}
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{song.artist}</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                <path d="M7 17L17 7M7 7h10v10"/>
+              </svg>
+            </div>
+          ))}
+
+          {/* Search all button */}
+          <div onClick={handleSubmit}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 16px", cursor: "pointer",
+              background: darkMode ? "rgba(108,99,255,0.08)" : "#f8f5ff",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = darkMode ? "rgba(108,99,255,0.15)" : "#efe8ff"}
+            onMouseLeave={e => e.currentTarget.style.background = darkMode ? "rgba(108,99,255,0.08)" : "#f8f5ff"}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: darkMode ? "#a0a0ff" : "#6c63ff" }}>
+                Search all results for "{inputValue}"
+              </div>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>Press Enter or tap here</div>
+            </div>
+          </div>
+        </div>
       )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes suggestionsDrop {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
