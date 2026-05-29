@@ -1,4 +1,3 @@
-import { useContext } from "react";
 import { ThemeContext } from "../ThemeContext";
 import AiDiscovery from "./AiDiscovery";
 import { useContext, useState, useEffect, useRef } from "react";
