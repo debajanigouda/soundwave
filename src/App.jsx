@@ -605,6 +605,7 @@ function FullScreenPlayer({
 }) {
   const [showQueue, setShowQueue] = useState(false);
   const [showSleepPicker, setShowSleepPicker] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
   const pct = duration ? (progress / duration) * 100 : 0;
   const liked = currentSong && likedSongs.has(currentSong.id);
   const fmt = s => !s || isNaN(s) ? "0:00" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -617,14 +618,13 @@ function FullScreenPlayer({
       {/* Blurred bg */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0, backgroundImage: `url(${currentSong?.thumbnail})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(40px) brightness(0.25)", transform: "scale(1.1)" }} />
 
-      {/* Queue panel overlay */}
+      {/* Queue panel */}
       {showQueue && (
         <div style={{ position: "absolute", inset: 0, zIndex: 10, background: "rgba(0,0,0,0.92)", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 20px 12px", flexShrink: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Up Next</div>
             <button onClick={() => setShowQueue(false)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: "50%", width: 36, height: 36, color: "#fff", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           </div>
-          {/* Now playing */}
           {currentSong && (
             <div style={{ padding: "0 20px 8px" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#1db954", letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Now Playing</div>
@@ -679,6 +679,7 @@ function FullScreenPlayer({
 
       {/* Main content */}
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%", padding: "0 0 env(safe-area-inset-bottom, 16px)" }}>
+
         {/* Top bar */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 8px", flexShrink: 0 }}>
           <button onClick={onClose}
@@ -687,9 +688,7 @@ function FullScreenPlayer({
           </button>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: 2 }}>NOW PLAYING</div>
-            {sleepRemaining && (
-              <div style={{ fontSize: 11, color: "#1db954", marginTop: 2 }}>😴 {fmtSleep(sleepRemaining)}</div>
-            )}
+            {sleepRemaining && <div style={{ fontSize: 11, color: "#1db954", marginTop: 2 }}>😴 {fmtSleep(sleepRemaining)}</div>}
           </div>
           <button onClick={() => currentSong && toggleLike(currentSong.id)}
             style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: liked ? "#1db954" : "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -699,25 +698,50 @@ function FullScreenPlayer({
           </button>
         </div>
 
-        {/* Album art */}
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 32px" }}>
-          <div style={{ width: "100%", maxWidth: 320, aspectRatio: "1/1", borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
-            <img src={currentSong?.thumbnail} alt={currentSong?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        {/* ART or LYRICS — toggleable */}
+        <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+
+          {/* Album art view */}
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "8px 32px",
+            opacity: showLyrics ? 0 : 1,
+            transform: showLyrics ? "scale(0.85)" : "scale(1)",
+            transition: "all 0.4s cubic-bezier(0.4,0,0.2,1)",
+            pointerEvents: showLyrics ? "none" : "auto",
+          }}>
+            <div style={{ width: "100%", maxWidth: 300, aspectRatio: "1/1", borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+              <img src={currentSong?.thumbnail} alt={currentSong?.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </div>
+          </div>
+
+          {/* Lyrics view */}
+          <div style={{
+            position: "absolute", inset: 0,
+            opacity: showLyrics ? 1 : 0,
+            transform: showLyrics ? "translateY(0)" : "translateY(20px)",
+            transition: "all 0.4s cubic-bezier(0.4,0,0.2,1)",
+            pointerEvents: showLyrics ? "auto" : "none",
+            overflowY: "auto",
+            padding: "8px 0 16px",
+          }}>
+            <LyricsPanel currentSong={currentSong} progress={progress} />
           </div>
         </div>
-{/* Lyrics */}
-<LyricsPanel currentSong={currentSong} progress={progress} />
+
         {/* Controls */}
         <div style={{ flexShrink: 0, padding: "0 28px 16px" }}>
+
           {/* Title + share */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: -0.5, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong?.title}</div>
-              <div style={{ fontSize: 15, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>{currentSong?.artist}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: -0.5, marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{currentSong?.title}</div>
+              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>{currentSong?.artist}</div>
             </div>
             <button onClick={() => shareSong(currentSong)}
-              style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
               </svg>
@@ -725,9 +749,9 @@ function FullScreenPlayer({
           </div>
 
           {/* Progress */}
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 16 }}>
             <div onClick={e => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); }}
-              style={{ height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", marginBottom: 10, position: "relative" }}>
+              style={{ height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer", marginBottom: 8, position: "relative" }}>
               <div style={{ width: `${pct}%`, height: "100%", background: "#fff", borderRadius: 4, transition: "width 1s linear" }} />
               <div style={{ position: "absolute", left: `${pct}%`, top: "50%", transform: "translate(-50%,-50%)", width: 14, height: 14, background: "#fff", borderRadius: "50%", boxShadow: "0 0 8px rgba(255,255,255,0.5)", pointerEvents: "none" }} />
             </div>
@@ -738,21 +762,21 @@ function FullScreenPlayer({
           </div>
 
           {/* Playback controls */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <button onClick={() => setIsShuffle(s => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: isShuffle ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}><ShuffleIcon size={22} /></button>
-            <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={34} /></button>
+            <button onClick={prevSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><PrevIcon size={32} /></button>
             <button onClick={togglePlay}
-              style={{ width: 68, height: 68, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 24px rgba(255,255,255,0.2)" }}>
+              style={{ width: 64, height: 64, borderRadius: "50%", background: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 24px rgba(255,255,255,0.2)" }}>
               {isBuffering
-                ? <div style={{ width: 26, height: 26, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
-                : isPlaying ? <PauseIcon size={30} color="#000" /> : <PlayIcon size={30} color="#000" />}
+                ? <div style={{ width: 24, height: 24, border: "3px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin2 0.8s linear infinite" }} />
+                : isPlaying ? <PauseIcon size={28} color="#000" /> : <PlayIcon size={28} color="#000" />}
             </button>
-            <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={34} /></button>
+            <button onClick={nextSong} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", display: "flex", padding: 8 }}><NextIcon size={32} /></button>
             <button onClick={() => setIsRepeat(r => !r)} style={{ background: "none", border: "none", cursor: "pointer", color: isRepeat ? "#1db954" : "rgba(255,255,255,0.4)", padding: 8 }}><RepeatIcon size={22} /></button>
           </div>
 
-          {/* Bottom row: volume + queue + sleep */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Bottom row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => setIsMuted(m => !m)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 {isMuted
@@ -764,17 +788,36 @@ function FullScreenPlayer({
               style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.15)", borderRadius: 4, cursor: "pointer" }}>
               <div style={{ width: `${isMuted ? 0 : volume * 100}%`, height: "100%", background: "rgba(255,255,255,0.7)", borderRadius: 4 }} />
             </div>
+
+            {/* Lyrics toggle button */}
+            <button onClick={() => setShowLyrics(l => !l)}
+              style={{
+                background: showLyrics ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)",
+                border: showLyrics ? "1px solid #1db954" : "none",
+                borderRadius: 10, cursor: "pointer", padding: "7px 10px",
+                color: showLyrics ? "#1db954" : "rgba(255,255,255,0.7)",
+                fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 5,
+                transition: "all 0.2s ease",
+              }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="16" y2="12"/><line x1="3" y1="18" x2="12" y2="18"/>
+              </svg>
+              Lyrics
+            </button>
+
             {/* Queue btn */}
             <button onClick={() => setShowQueue(true)}
-              style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontFamily: "inherit" }}>
+              style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 10, cursor: "pointer", padding: "7px 10px", color: "rgba(255,255,255,0.7)", display: "flex", alignItems: "center" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
                 <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
               </svg>
             </button>
+
             {/* Sleep btn */}
             <button onClick={() => setShowSleepPicker(true)}
-              style={{ background: sleepMinutes ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)", border: sleepMinutes ? "1px solid #1db954" : "none", borderRadius: 10, cursor: "pointer", padding: "8px 10px", color: sleepMinutes ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: 16, display: "flex", alignItems: "center" }}>
+              style={{ background: sleepMinutes ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)", border: sleepMinutes ? "1px solid #1db954" : "none", borderRadius: 10, cursor: "pointer", padding: "7px 10px", color: sleepMinutes ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: 15, display: "flex", alignItems: "center" }}>
               😴
             </button>
           </div>
