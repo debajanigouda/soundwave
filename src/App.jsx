@@ -326,6 +326,13 @@ useEffect(() => {
 
 }, [currentSong]);
 
+// ✅ Force Samsung to show expanded player with next/prev
+  try {
+    navigator.mediaSession.setActionHandler("seekto", null);
+    navigator.mediaSession.setActionHandler("seekbackward", null);  
+    navigator.mediaSession.setActionHandler("seekforward", null);
+  } catch(e) {}
+
 // ✅ Update playing/paused state on lock screen
 useEffect(() => {
   if (!("mediaSession" in navigator)) return;
