@@ -219,24 +219,92 @@ useEffect(() => {
   }, [volume, isMuted]);
 
   useEffect(() => {
-    if (!currentSong || !("mediaSession" in navigator)) return;
+  if (!("mediaSession" in navigator)) return;
+
+  if (currentSong) {
+    // Set metadata
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title, artist: currentSong.artist,
-artwork: [
-  { src: currentSong.thumbnail, sizes: "96x96",   type: "image/jpeg" },
-  { src: currentSong.thumbnail, sizes: "128x128",  type: "image/jpeg" },
-  { src: currentSong.thumbnail, sizes: "192x192",  type: "image/jpeg" },
-  { src: currentSong.thumbnail, sizes: "256x256",  type: "image/jpeg" },
-  { src: currentSong.thumbnail, sizes: "384x384",  type: "image/jpeg" },
-  { src: currentSong.thumbnail, sizes: "512x512",  type: "image/jpeg" },
-  ],
-});
-    navigator.mediaSession.setActionHandler("play", () => togglePlay());
-    navigator.mediaSession.setActionHandler("pause", () => togglePlay());
-    navigator.mediaSession.setActionHandler("nexttrack", () => nextSong());
-    navigator.mediaSession.setActionHandler("previoustrack", () => prevSong());
+      title: currentSong.title,
+      artist: currentSong.artist,
+      album: "SoundWave",
+      artwork: [
+        { src: currentSong.thumbnail, sizes: "96x96",   type: "image/jpeg" },
+        { src: currentSong.thumbnail, sizes: "128x128", type: "image/jpeg" },
+        { src: currentSong.thumbnail, sizes: "192x192", type: "image/jpeg" },
+        { src: currentSong.thumbnail, sizes: "256x256", type: "image/jpeg" },
+        { src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" },
+      ],
+    });
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
-  }, [currentSong]);
+  }
+
+  // ✅ Set action handlers OUTSIDE the currentSong check
+  // so they always stay registered
+  navigator.mediaSession.setActionHandler("play", () => {
+    playerRef.current?.playVideo();
+    setIsPlaying(true);
+  });
+  navigator.mediaSession.setActionHandler("pause", () => {
+    playerRef.current?.pauseVideo();
+    setIsPlaying(false);
+  });
+  navigator.mediaSession.setActionHandler("nexttrack", () => {
+    const list = songsRef.current;
+    const cur = currentSongRef.current;
+    if (!list.length) return;
+    if (isShuffleRef.current) {
+      playSongFn.current?.(list[Math.floor(Math.random() * list.length)]);
+      return;
+    }
+    const idx = list.findIndex(s => s.id === cur?.id);
+    playSongFn.current?.(list[(idx + 1) % list.length]);
+  });
+  navigator.mediaSession.setActionHandler("previoustrack", () => {
+    const list = songsRef.current;
+    const cur = currentSongRef.current;
+    if (!list.length) return;
+    const idx = list.findIndex(s => s.id === cur?.id);
+    playSongFn.current?.(list[(idx - 1 + list.length) % list.length]);
+  });
+  navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+    const skipTime = details.seekOffset || 10;
+    if (playerRef.current?.seekTo) {
+      const newTime = Math.max(0, (playerRef.current.getCurrentTime() || 0) - skipTime);
+      playerRef.current.seekTo(newTime, true);
+      setProgress(newTime);
+    }
+  });
+  navigator.mediaSession.setActionHandler("seekforward", (details) => {
+    const skipTime = details.seekOffset || 10;
+    if (playerRef.current?.seekTo) {
+      const newTime = Math.min(
+        playerRef.current.getDuration() || 0,
+        (playerRef.current.getCurrentTime() || 0) + skipTime
+      );
+      playerRef.current.seekTo(newTime, true);
+      setProgress(newTime);
+    }
+  });
+
+}, [currentSong]);
+
+// ✅ Update playback state so lock screen shows correct play/pause icon
+useEffect(() => {
+  if (!("mediaSession" in navigator)) return;
+  navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+}, [isPlaying]);
+
+// ✅ Update position state for lock screen seek bar
+useEffect(() => {
+  if (!("mediaSession" in navigator) || !duration) return;
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: duration,
+      playbackRate: 1,
+      position: Math.min(progress, duration),
+    });
+  } catch (e) {}
+}, [progress, duration]);
 
   useEffect(() => { if (songs.length > 0) prefetchSongs(songs.slice(0, 5)); }, [songs]);
 
