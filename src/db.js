@@ -118,3 +118,21 @@ export async function getHistory(userId) {
     .limit(50);
   return data || [];
 }
+// ── PUBLIC PLAYLIST (no login needed) ────────────────────
+export async function getPublicPlaylist(playlistId) {
+  const { data: playlist } = await supabase
+    .from("playlists")
+    .select("*, playlist_songs(*)")
+    .eq("id", playlistId)
+    .single();
+  return playlist || null;
+}
+export async function makePlaylistPublic(playlistId) {
+  const { data } = await supabase
+    .from("playlists")
+    .update({ is_public: true })
+    .eq("id", playlistId)
+    .select()
+    .single();
+  return data;
+}

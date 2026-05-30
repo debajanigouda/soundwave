@@ -38,6 +38,10 @@ const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
 
+ // ✅ Check URL FIRST before any hooks
+  const hash = window.location.hash;
+  const playlistMatch = hash.match(/^#\/playlist\/([a-f0-9-]+)$/i);
+
 // Sleep timer
   const [sleepMinutes, setSleepMinutes] = useState(null);
   const [sleepRemaining, setSleepRemaining] = useState(null);
@@ -55,6 +59,15 @@ const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong,
   useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
   useEffect(() => { isRepeatRef.current = isRepeat; }, [isRepeat]);
   useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
+
+   if (playlistMatch) {
+    return (
+      <PublicPlaylistPage
+        playlistId={playlistMatch[1]}
+        onOpenApp={() => { window.location.hash = ""; window.location.reload(); }}
+      />
+    );
+  }
 
   useEffect(() => {
     const fn = () => setIsMobile(window.innerWidth < 768);
@@ -1226,6 +1239,138 @@ function AddToPlaylistModal({ playlists, song, onAdd, onClose, onCreate }) {
             </div>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PublicPlaylistPage({ playlistId, onOpenApp }) {
+  const [playlist, setPlaylist] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { getPublicPlaylist } = await import("./db");
+        const data = await getPublicPlaylist(playlistId);
+        if (!data) setNotFound(true);
+        else setPlaylist(data);
+      } catch (e) {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [playlistId]);
+
+  const songs = playlist?.playlist_songs?.map(s => ({
+    id: s.song_id,
+    title: s.title,
+    artist: s.artist,
+    thumbnail: s.thumbnail,
+    youtubeId: s.youtube_id,
+  })) || [];
+
+  if (loading) return (
+    <div style={{ height: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+      <div style={{ width: 48, height: 48, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>♪</div>
+      <div style={{ color: "#6b7280", fontSize: 14 }}>Loading playlist...</div>
+    </div>
+  );
+
+  if (notFound) return (
+    <div style={{ height: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, padding: 32 }}>
+      <div style={{ fontSize: 52 }}>😕</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>Playlist not found</div>
+      <div style={{ fontSize: 14, color: "#6b7280", textAlign: "center" }}>This playlist may have been deleted or made private</div>
+      <button onClick={onOpenApp} style={{ background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", border: "none", borderRadius: 100, padding: "12px 28px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8 }}>
+        Open SoundWave
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#0a0a0f", color: "#fff" }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(180deg, #1a0a2e 0%, #0a0a0f 100%)", padding: "48px 24px 32px" }}>
+        <div style={{ maxWidth: 600, margin: "0 auto" }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 32 }}>
+            <div style={{ width: 32, height: 32, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>♪</div>
+            <span style={{ fontSize: 16, fontWeight: 800, background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SoundWave</span>
+          </div>
+
+          {/* Playlist info */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 24 }}>
+            <div style={{ width: 100, height: 100, borderRadius: 20, background: playlist?.color || "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, flexShrink: 0, boxShadow: "0 8px 32px rgba(108,99,255,0.3)" }}>
+              {playlist?.cover_emoji || "🎵"}
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 6 }}>Playlist</div>
+              <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5, marginBottom: 6 }}>{playlist?.name}</div>
+              <div style={{ fontSize: 13, color: "#6b7280" }}>{songs.length} songs</div>
+            </div>
+          </div>
+
+          {/* Open in app button */}
+          <button onClick={onOpenApp}
+            style={{ background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", border: "none", borderRadius: 100, padding: "14px 32px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 20px rgba(108,99,255,0.4)", width: "100%", marginBottom: 12, transition: "transform 0.2s" }}
+            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.02)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+            🎵 Open in SoundWave & Play
+          </button>
+
+          {/* Share button */}
+          <button onClick={() => {
+            const url = window.location.href;
+            if (navigator.share) {
+              navigator.share({ title: playlist?.name, text: `Listen to "${playlist?.name}" on SoundWave!`, url });
+            } else {
+              navigator.clipboard.writeText(url);
+              alert("Link copied!");
+            }
+          }}
+            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, padding: "12px 32px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%", transition: "all 0.2s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.14)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}>
+            🔗 Copy Share Link
+          </button>
+        </div>
+      </div>
+
+      {/* Songs list */}
+      <div style={{ maxWidth: 600, margin: "0 auto", padding: "24px 24px 48px" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#6b7280", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>Songs</div>
+        {songs.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "#6b7280" }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🎵</div>
+            <div>No songs in this playlist yet</div>
+          </div>
+        )}
+        {songs.map((song, i) => (
+          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ width: 20, textAlign: "center", color: "#6b7280", fontSize: 13, flexShrink: 0 }}>{i + 1}</div>
+            <img src={song.thumbnail} alt={song.title}
+              style={{ width: 48, height: 48, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+              onError={e => { e.target.style.background = "#6c63ff"; e.target.src = ""; }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{song.title}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{song.artist}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer CTA */}
+      <div style={{ background: "linear-gradient(0deg, #1a0a2e 0%, transparent 100%)", padding: "32px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Want to listen? It's free! 🎵</div>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 20 }}>SoundWave — Every Song. Every World.</div>
+        <button onClick={onOpenApp}
+          style={{ background: "linear-gradient(135deg,#6c63ff,#ff6b9d)", border: "none", borderRadius: 100, padding: "14px 40px", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          Open SoundWave Free →
+        </button>
       </div>
     </div>
   );

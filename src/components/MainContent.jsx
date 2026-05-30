@@ -421,31 +421,62 @@ function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, pla
       )}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: 14, marginBottom: 36 }}>
         {playlists.map(p => (
-  <div key={p.id}
-   onClick={() => {
-  const playlistSongs = p.playlist_songs
-    ?.map(ps => {
-      const s = ps.songs || ps;
-      // Fix field names from Supabase format to app format
-      return {
-        id: s.id,
-        title: s.title,
-        artist: s.artist,
-        thumbnail: s.thumbnail,
-        youtubeId: s.youtubeId || s.youtube_id,
-      };
-    })
-    .filter(s => s.youtubeId);
-  if (playlistSongs?.length > 0) playSong(playlistSongs[0]);
-}}
-    style={{ background: cardBg, border: `1px solid ${cardBdr}`, borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s" }}
-    onMouseEnter={e => e.currentTarget.style.background = cardHov}
-    onMouseLeave={e => e.currentTarget.style.background = cardBg}>
-            <div style={{ width: "100%", aspectRatio: "1", borderRadius: 12, background: p.color || "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 10 }}>
-              {p.cover_emoji || p.emoji || "🎵"}
+          <div key={p.id} style={{ position: "relative" }}>
+            {/* Share button */}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                const url = `${window.location.origin}/#/playlist/${p.id}`;
+                if (navigator.share) {
+                  navigator.share({
+                    title: p.name,
+                    text: `🎵 Listen to "${p.name}" on SoundWave!`,
+                    url,
+                  });
+                } else {
+                  navigator.clipboard.writeText(url);
+                  alert("Link copied! Share it with friends 🎵");
+                }
+              }}
+              style={{
+                position: "absolute", top: 8, right: 8, zIndex: 2,
+                background: "rgba(108,99,255,0.85)",
+                border: "none", borderRadius: 8,
+                cursor: "pointer", padding: "4px 8px",
+                color: "#fff", fontSize: 11,
+                fontWeight: 700, fontFamily: "inherit",
+              }}>
+              🔗
+            </button>
+            {/* Playlist card */}
+            <div
+              onClick={() => {
+                const playlistSongs = p.playlist_songs
+                  ?.map(ps => {
+                    const s = ps.songs || ps;
+                    return {
+                      id: s.id,
+                      title: s.title,
+                      artist: s.artist,
+                      thumbnail: s.thumbnail,
+                      youtubeId: s.youtubeId || s.youtube_id,
+                    };
+                  })
+                  .filter(s => s.youtubeId);
+                if (playlistSongs?.length > 0) playSong(playlistSongs[0]);
+              }}
+              style={{
+                background: cardBg, border: `1px solid ${cardBdr}`,
+                borderRadius: 16, padding: 12, cursor: "pointer", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = cardHov}
+              onMouseLeave={e => e.currentTarget.style.background = cardBg}>
+              <div style={{ width: "100%", aspectRatio: "1", borderRadius: 12, background: p.color || "linear-gradient(135deg,#6c63ff,#ff6b9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, marginBottom: 10 }}>
+                {p.cover_emoji || p.emoji || "🎵"}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#fff" : "#111", marginBottom: 2 }}>{p.name}</div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>{p.playlist_songs?.length || 0} songs</div>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#fff" : "#111", marginBottom: 2 }}>{p.name}</div>
-            <div style={{ fontSize: 11, color: "#6b7280" }}>{p.playlist_songs?.length || 0} songs</div>
           </div>
         ))}
       </div>
