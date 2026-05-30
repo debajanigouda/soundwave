@@ -221,8 +221,8 @@ useEffect(() => {
   useEffect(() => {
   if (!("mediaSession" in navigator)) return;
 
+  // ✅ Set metadata for all devices
   if (currentSong) {
-    // Set metadata
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title,
       artist: currentSong.artist,
@@ -232,76 +232,116 @@ useEffect(() => {
         { src: currentSong.thumbnail, sizes: "128x128", type: "image/jpeg" },
         { src: currentSong.thumbnail, sizes: "192x192", type: "image/jpeg" },
         { src: currentSong.thumbnail, sizes: "256x256", type: "image/jpeg" },
+        { src: currentSong.thumbnail, sizes: "384x384", type: "image/jpeg" },
         { src: currentSong.thumbnail, sizes: "512x512", type: "image/jpeg" },
       ],
     });
     localStorage.setItem("sw_current_song", JSON.stringify(currentSong));
   }
 
-  // ✅ Set action handlers OUTSIDE the currentSong check
-  // so they always stay registered
-  navigator.mediaSession.setActionHandler("play", () => {
-    playerRef.current?.playVideo();
-    setIsPlaying(true);
-  });
-  navigator.mediaSession.setActionHandler("pause", () => {
-    playerRef.current?.pauseVideo();
-    setIsPlaying(false);
-  });
-  navigator.mediaSession.setActionHandler("nexttrack", () => {
-    const list = songsRef.current;
-    const cur = currentSongRef.current;
-    if (!list.length) return;
-    if (isShuffleRef.current) {
-      playSongFn.current?.(list[Math.floor(Math.random() * list.length)]);
-      return;
-    }
-    const idx = list.findIndex(s => s.id === cur?.id);
-    playSongFn.current?.(list[(idx + 1) % list.length]);
-  });
-  navigator.mediaSession.setActionHandler("previoustrack", () => {
-    const list = songsRef.current;
-    const cur = currentSongRef.current;
-    if (!list.length) return;
-    const idx = list.findIndex(s => s.id === cur?.id);
-    playSongFn.current?.(list[(idx - 1 + list.length) % list.length]);
-  });
-  navigator.mediaSession.setActionHandler("seekbackward", (details) => {
-    const skipTime = details.seekOffset || 10;
-    if (playerRef.current?.seekTo) {
-      const newTime = Math.max(0, (playerRef.current.getCurrentTime() || 0) - skipTime);
-      playerRef.current.seekTo(newTime, true);
-      setProgress(newTime);
-    }
-  });
-  navigator.mediaSession.setActionHandler("seekforward", (details) => {
-    const skipTime = details.seekOffset || 10;
-    if (playerRef.current?.seekTo) {
-      const newTime = Math.min(
-        playerRef.current.getDuration() || 0,
-        (playerRef.current.getCurrentTime() || 0) + skipTime
-      );
-      playerRef.current.seekTo(newTime, true);
-      setProgress(newTime);
-    }
-  });
+  // ✅ Play
+  try {
+    navigator.mediaSession.setActionHandler("play", () => {
+      playerRef.current?.playVideo();
+      setIsPlaying(true);
+    });
+  } catch (e) {}
+
+  // ✅ Pause
+  try {
+    navigator.mediaSession.setActionHandler("pause", () => {
+      playerRef.current?.pauseVideo();
+      setIsPlaying(false);
+    });
+  } catch (e) {}
+
+  // ✅ Next track — works on ALL phones
+  try {
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      const list = songsRef.current;
+      const cur = currentSongRef.current;
+      if (!list.length) return;
+      if (isShuffleRef.current) {
+        playSongFn.current?.(list[Math.floor(Math.random() * list.length)]);
+        return;
+      }
+      const idx = list.findIndex(s => s.id === cur?.id);
+      playSongFn.current?.(list[(idx + 1) % list.length]);
+    });
+  } catch (e) {}
+
+  // ✅ Previous track — works on ALL phones
+  try {
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      const list = songsRef.current;
+      const cur = currentSongRef.current;
+      if (!list.length) return;
+      const idx = list.findIndex(s => s.id === cur?.id);
+      playSongFn.current?.(list[(idx - 1 + list.length) % list.length]);
+    });
+  } catch (e) {}
+
+  // ✅ Seek backward — for phones that show seek instead of prev/next
+  try {
+    navigator.mediaSession.setActionHandler("seekbackward", (details) => {
+      const skip = details?.seekOffset || 10;
+      if (playerRef.current) {
+        const newTime = Math.max(0, (playerRef.current.getCurrentTime?.() || 0) - skip);
+        playerRef.current.seekTo(newTime, true);
+        setProgress(newTime);
+      }
+    });
+  } catch (e) {}
+
+  // ✅ Seek forward — for phones that show seek instead of prev/next
+  try {
+    navigator.mediaSession.setActionHandler("seekforward", (details) => {
+      const skip = details?.seekOffset || 10;
+      if (playerRef.current) {
+        const dur = playerRef.current.getDuration?.() || 0;
+        const newTime = Math.min(dur, (playerRef.current.getCurrentTime?.() || 0) + skip);
+        playerRef.current.seekTo(newTime, true);
+        setProgress(newTime);
+      }
+    });
+  } catch (e) {}
+
+  // ✅ Seek to exact position — for phones with seek bar on lock screen
+  try {
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (details?.seekTime !== undefined && playerRef.current) {
+        playerRef.current.seekTo(details.seekTime, true);
+        setProgress(Math.floor(details.seekTime));
+      }
+    });
+  } catch (e) {}
+
+  // ✅ Stop
+  try {
+    navigator.mediaSession.setActionHandler("stop", () => {
+      playerRef.current?.pauseVideo();
+      setIsPlaying(false);
+    });
+  } catch (e) {}
 
 }, [currentSong]);
 
-// ✅ Update playback state so lock screen shows correct play/pause icon
+// ✅ Update playing/paused state on lock screen
 useEffect(() => {
   if (!("mediaSession" in navigator)) return;
-  navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  try {
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  } catch (e) {}
 }, [isPlaying]);
 
-// ✅ Update position state for lock screen seek bar
+// ✅ Update seek bar position on lock screen
 useEffect(() => {
-  if (!("mediaSession" in navigator) || !duration) return;
+  if (!("mediaSession" in navigator) || !duration || duration <= 0) return;
   try {
     navigator.mediaSession.setPositionState({
       duration: duration,
       playbackRate: 1,
-      position: Math.min(progress, duration),
+      position: Math.min(Math.max(0, progress), duration),
     });
   } catch (e) {}
 }, [progress, duration]);
