@@ -10,7 +10,7 @@ export default function Player({
   currentSong, isPlaying, isBuffering, togglePlay, nextSong, prevSong,
   progress, duration, seekTo, volume, setVolume, isMuted, setIsMuted,
   isShuffle, setIsShuffle, isRepeat, setIsRepeat, likedSongs, toggleLike,
-  songs, playSong, isMobile,
+  songs, playSong, isMobile,isRadioMode, setIsRadioMode, fetchRelatedSongs,
 }) {
   const [showQueue, setShowQueue] = useState(false);
 
@@ -205,6 +205,26 @@ export default function Player({
               <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
             </svg>
           </IconBtn>
+
+          {/* Radio mode button */}
+<IconBtn
+  onClick={() => {
+    setIsRadioMode(r => !r);
+    if (!isRadioMode && currentSong) {
+      // Start radio immediately
+      fetchRelatedSongs?.(currentSong);
+    }
+  }}
+  active={isRadioMode}
+  title="Radio Mode — autoplay similar songs">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <circle cx="12" cy="12" r="2"/>
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+    <path d="M7.76 7.76a6 6 0 0 0 0 8.49"/>
+    <path d="M20.07 4.93a10 10 0 0 1 0 14.14"/>
+    <path d="M3.93 4.93a10 10 0 0 0 0 14.14"/>
+  </svg>
+</IconBtn>
 
           <button onClick={() => setIsMuted(m => !m)} className="icon-btn"
             style={{ background: "none", border: "none", cursor: "pointer", color: isMuted ? "#ff6b6b" : "#6b7280", display: "flex", padding: 6 }}

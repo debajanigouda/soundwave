@@ -13,6 +13,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import useOfflineCache from "./hooks/useOfflineCache";
 import Logo from "./components/Logo";
 import { MiniPlayer } from "./components/Player";
+import { searchSongs, getTrending, prefetchSongs, getRelatedSongs } from "./api";
 
 export default function App() {
   const [songs, setSongs] = useState([]);
@@ -37,6 +38,8 @@ const [selectedSong, setSelectedSong] = useState(null);
 const [toast, setToast] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 const { cachedSongs, isCached, deleteCachedSong } = useOfflineCache(currentSong, isPlaying);
+const [isRadioMode, setIsRadioMode] = useState(false);
+const [radioQueue, setRadioQueue] = useState([]);
 
  // ✅ Check URL FIRST before any hooks
   const hash = window.location.hash;
@@ -425,6 +428,26 @@ useEffect(() => {
   }
   playSongFn.current = playSong;
 
+  // ── AUTO RADIO — fetch related songs ─────────────────────
+async function fetchRelatedSongs(song) {
+  if (!song) return;
+  console.log("📻 Fetching related songs for:", song.title);
+  const related = await getRelatedSongs(song.youtubeId, song.title, song.artist);
+  if (related.length > 0) {
+    setRadioQueue(related);
+    setSongs(prev => {
+      // Add related songs after current song if not already there
+      const currentIdx = prev.findIndex(s => s.id === song.id);
+      const newSongs = [...prev];
+      // Remove old radio songs after current
+      const base = newSongs.slice(0, currentIdx + 1);
+      // Add new related songs
+      return [...base, ...related];
+    });
+    console.log(`✅ Added ${related.length} related songs to queue`);
+  }
+}
+
   function togglePlay() {
     if (!currentSong) { if (songsRef.current.length > 0) playSong(songsRef.current[0]); return; }
     isPlaying ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
@@ -451,6 +474,8 @@ useEffect(() => {
     playerRef.current.seekTo(pct * duration, true);
     setProgress(Math.floor(pct * duration));
   }
+
+  
 
   async function toggleLike(id) {
     const song = songs.find(s => s.id === id);
@@ -544,6 +569,9 @@ async function handleCreatePlaylist(name, emoji) {
 isCached,
 deleteCachedSong,
 shareSong,
+ isRadioMode,
+  setIsRadioMode,
+  fetchRelatedSongs,
 };
 
   if (authLoading) {
@@ -955,6 +983,29 @@ function FullScreenPlayer({
               style={{ background: sleepMinutes ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)", border: sleepMinutes ? "1px solid #1db954" : "none", borderRadius: 10, cursor: "pointer", padding: "7px 10px", color: sleepMinutes ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: 15, display: "flex", alignItems: "center" }}>
               😴
             </button>
+            {/* Radio button */}
+<button
+
+  onClick={() => {
+    setIsRadioMode(r => !r);
+    if (!isRadioMode && currentSong) fetchRelatedSongs(currentSong);
+  }}
+  style={{
+    background: isRadioMode ? "rgba(29,185,84,0.2)" : "rgba(255,255,255,0.1)",
+    border: isRadioMode ? "1px solid #1db954" : "none",
+    borderRadius: 10, cursor: "pointer",
+    padding: "7px 10px",
+    color: isRadioMode ? "#1db954" : "rgba(255,255,255,0.7)",
+    fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+    display: "flex", alignItems: "center", gap: 5,
+  }}>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="2"/>
+    <path d="M16.24 7.76a6 6 0 0 1 0 8.49"/>
+    <path d="M7.76 7.76a6 6 0 0 0 0 8.49"/>
+  </svg>
+  Radio
+</button>
           </div>
         </div>
       </div>
