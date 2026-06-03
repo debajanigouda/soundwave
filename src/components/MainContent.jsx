@@ -487,7 +487,40 @@ function LibraryPage({ playlists, songs, likedSongs, currentSong, isPlaying, pla
 }
 
 function LikedPage({ songs, likedSongs, currentSong, isPlaying, playSong, toggleLike, isMobile, darkMode, handleAddToPlaylist }) {
-  const liked = songs.filter(s => likedSongs.has(s.id));
+  const [likedSongsList, setLikedSongsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLiked() {
+      try {
+        const { supabase } = await import("../supabase");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) { setLoading(false); return; }
+
+        const { data } = await supabase
+          .from("liked_songs")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false });
+
+        if (data) {
+          setLikedSongsList(data.map(s => ({
+            id: s.song_id,
+            title: s.title,
+            artist: s.artist,
+            thumbnail: s.thumbnail,
+            youtubeId: s.youtube_id,
+          })));
+        }
+      } catch (e) {
+        console.log("Error loading liked songs:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLiked();
+  }, [likedSongs]); // ✅ re-fetch when likedSongs changes
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 20, paddingBottom: 24, marginBottom: 24, borderBottom: `1px solid ${darkMode ? "#1e1e2e" : "#e0e0ee"}` }}>
@@ -495,15 +528,34 @@ function LikedPage({ songs, likedSongs, currentSong, isPlaying, playSong, toggle
         <div>
           <div style={{ fontSize: 11, color: "#6b7280", letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Playlist</div>
           <div style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, color: darkMode ? "#fff" : "#111", marginBottom: 6, letterSpacing: -1 }}>Liked Songs</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{liked.length} songs</div>
-          {liked.length > 0 && (
-            <button onClick={() => playSong(liked[0])} style={{ background: "#1db954", color: "#000", border: "none", padding: "10px 28px", borderRadius: 100, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>▶ Play</button>
+          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>{likedSongsList.length} songs</div>
+          {likedSongsList.length > 0 && (
+            <button onClick={() => playSong(likedSongsList[0])}
+              style={{ background: "#1db954", color: "#000", border: "none", padding: "10px 28px", borderRadius: 100, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              ▶ Play All
+            </button>
           )}
         </div>
       </div>
-      {liked.length === 0
-        ? <Empty emoji="♥" text="No liked songs yet" sub="Tap the heart on any song to save it here" darkMode={darkMode} />
-        : <SongList songs={liked} isLoading={false} likedSongs={likedSongs} currentSong={currentSong} isPlaying={isPlaying} playSong={playSong} toggleLike={toggleLike} isMobile={isMobile} darkMode={darkMode} handleAddToPlaylist={handleAddToPlaylist} />}
+
+      {loading ? (
+        <LoadingSkeleton darkMode={darkMode} />
+      ) : likedSongsList.length === 0 ? (
+        <Empty emoji="♥" text="No liked songs yet" sub="Tap the heart on any song to save it here" darkMode={darkMode} />
+      ) : (
+        <SongList
+          songs={likedSongsList}
+          isLoading={false}
+          likedSongs={likedSongs}
+          currentSong={currentSong}
+          isPlaying={isPlaying}
+          playSong={playSong}
+          toggleLike={toggleLike}
+          isMobile={isMobile}
+          darkMode={darkMode}
+          handleAddToPlaylist={handleAddToPlaylist}
+        />
+      )}
     </>
   );
 }
