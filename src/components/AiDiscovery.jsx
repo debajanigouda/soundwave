@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { searchSongs } from "../api";
 
+const BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : "http://localhost:3001/api";
+
 const VIBE_SUGGESTIONS = [
   "3am vibes", "gym workout", "sunday morning chill",
   "heartbreak", "road trip", "rainy day",
@@ -8,35 +12,14 @@ const VIBE_SUGGESTIONS = [
   "bollywood romantic", "90s nostalgia", "late night drive",
 ];
 
-async function askClaude(vibe) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+async function askAI(vibe) {
+  const response = await fetch(`${BASE}/ai-discover`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: `You are a music expert. A user wants to listen to music matching this vibe or mood: "${vibe}"
-
-Generate exactly 6 specific song search queries for YouTube Music that perfectly match this vibe.
-Each query should be a real song title + artist name that fits the mood.
-Mix popular and lesser-known tracks. Include both English and Hindi/Indian songs if the vibe suits it.
-
-Respond ONLY with a JSON array of 6 strings, no explanation, no markdown, no backticks.
-Example format: ["Blinding Lights The Weeknd","Tum Hi Ho Arijit Singh","Night Owl Galimatias","Raataan Lambiyan Jubin Nautiyal","Midnight Rain Taylor Swift","Khairiyat Arijit Singh"]`
-      }],
-    }),
+    body: JSON.stringify({ vibe }),
   });
   const data = await response.json();
-  const text = data.content?.[0]?.text || "[]";
-  try {
-    return JSON.parse(text.trim());
-  } catch {
-    // fallback: extract anything in quotes
-    const matches = text.match(/"([^"]+)"/g);
-    return matches ? matches.map(m => m.replace(/"/g, "")) : [];
-  }
+  return data.queries || [];
 }
 
 export default function AiDiscovery({ playSong, currentSong, isPlaying, likedSongs, toggleLike, darkMode, isMobile, handleAddToPlaylist }) {
@@ -56,9 +39,9 @@ export default function AiDiscovery({ playSong, currentSong, isPlaying, likedSon
     setCurrentVibe(query);
 
     try {
-      // Step 1: Ask Claude for song suggestions
+      // Step 1: Ask AI for song suggestions (via secure server)
       setLoadingStep("🤖 Understanding your vibe...");
-      const queries = await askClaude(query);
+      const queries = await askAI(query);
 
       if (!queries.length) {
         setError("Couldn't understand that vibe. Try something like '3am vibes' or 'gym workout'.");
